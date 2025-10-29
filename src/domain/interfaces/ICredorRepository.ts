@@ -10,5 +10,4 @@ export interface CredorSearchParams {
 
 export interface ICredorRepository {
   search(params: CredorSearchParams): Promise<PagedResult<Credor>>;
-  // testConnection foi removido
 }
