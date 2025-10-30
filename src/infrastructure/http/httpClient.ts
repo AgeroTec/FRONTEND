@@ -16,6 +16,26 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
 import { API_CONFIG, TENANT_CONFIG } from './apiConfig';
 import { v4 as uuidv4 } from 'uuid';
 
+interface PersistedAuthTokens {
+  accessToken?: string;
+  tokenType?: string;
+}
+
+interface PersistedAuthUser {
+  id: string;
+  name?: string;
+  nome?: string;
+}
+
+interface PersistedAuthState {
+  user?: PersistedAuthUser | null;
+  tokens?: PersistedAuthTokens | null;
+}
+
+interface PersistedAuthStorage {
+  state?: PersistedAuthState;
+}
+
 export class HttpClient {
   private client: AxiosInstance;
 
@@ -36,23 +56,28 @@ export class HttpClient {
     // Request interceptor - adiciona headers automáticos
     this.client.interceptors.request.use(
       (config) => {
+        const headers = (config.headers ?? {}) as Record<string, string>;
+
         // Headers obrigatórios
-        config.headers['X-Tenant-Id'] = TENANT_CONFIG.tenantId;
-        config.headers['X-Correlation-Id'] = uuidv4();
+        headers['X-Tenant-Id'] = TENANT_CONFIG.tenantId;
+        headers['X-Correlation-Id'] = uuidv4();
 
         // Recupera dados de autenticação do localStorage
         if (typeof window !== 'undefined') {
           const authData = this.getAuthData();
 
-          if (authData?.tokens?.accessToken) {
-            config.headers['Authorization'] = `Bearer ${authData.tokens.accessToken}`;
+          if (authData?.tokens?.accessToken && !headers['Authorization']) {
+            const tokenType = authData.tokens.tokenType ?? 'Bearer';
+            headers['Authorization'] = `${tokenType} ${authData.tokens.accessToken}`;
           }
 
           if (authData?.user) {
-            config.headers['X-User-Id'] = authData.user.id;
-            config.headers['X-User-Name'] = authData.user.nome;
+            headers['X-User-Id'] = authData.user.id;
+            headers['X-User-Name'] = authData.user.name ?? authData.user.nome ?? '';
           }
         }
+
+        config.headers = headers;
 
         return config;
       },
@@ -89,13 +114,13 @@ export class HttpClient {
   /**
    * Recupera dados de autenticação do localStorage
    */
-  private getAuthData(): any {
+  private getAuthData(): PersistedAuthState | null {
     try {
       const authStorage = localStorage.getItem('auth-storage');
       if (!authStorage) return null;
 
-      const parsed = JSON.parse(authStorage);
-      return parsed.state; // Zustand persist formato
+      const parsed: PersistedAuthStorage = JSON.parse(authStorage);
+      return parsed.state ?? null; // Zustand persist formato
     } catch (error) {
       console.error('Erro ao recuperar dados de autenticação:', error);
       return null;
