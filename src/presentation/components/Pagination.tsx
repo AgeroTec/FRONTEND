@@ -1,33 +1,36 @@
 interface PaginationProps {
   currentPage: number;
-  totalPages: number;
+  totalPages?: number;
   totalItems: number;
   pageSize: number;
-  hasPrevious: boolean;
-  hasNext: boolean;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
   onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   loading?: boolean;
 }
 
 export const Pagination = ({
   currentPage,
-  totalPages,
+  totalPages: totalPagesProp,
   totalItems,
   pageSize,
-  hasPrevious,
-  hasNext,
+  hasPrevious: hasPreviousProp,
+  hasNext: hasNextProp,
   onPageChange,
   onPageSizeChange,
   loading = false
 }: PaginationProps) => {
   const pageSizes = [10, 20, 50, 100];
-  
-  // ✅ Gerar array de páginas para mostrar (máximo 5 páginas)
+
+  const totalPages = totalPagesProp || Math.ceil(totalItems / pageSize);
+  const hasPrevious = hasPreviousProp ?? currentPage > 1;
+  const hasNext = hasNextProp ?? currentPage < totalPages;
+
   const getPageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
-    
+
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
     const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
     
@@ -53,22 +56,23 @@ export const Pagination = ({
       </div>
       
       <div className="flex items-center gap-4">
-        {/* Seletor de tamanho de página */}
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Itens por página:</label>
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            disabled={loading}
-            className="border rounded px-2 py-1 text-sm"
-          >
-            {pageSizes.map(size => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </div>
+        {onPageSizeChange && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Itens por página:</label>
+            <select
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              disabled={loading}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              {pageSizes.map(size => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Controles de paginação */}
         <div className="flex items-center gap-1">
