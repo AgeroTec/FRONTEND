@@ -20,6 +20,8 @@ import {
   HardHat,
   FileStackIcon,
   ChevronLeft,
+  CircleHelp,
+  FilePlus,
 } from "lucide-react";
 
 export default function Sidebar({ children }: { children: React.ReactNode }) {
@@ -269,7 +271,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
           {desktopOpen && <div className="border-t border-gray-200 my-2"></div>}
           {desktopOpen && <div className="text-gray-400 text-xs px-3 uppercase">Outros Módulos</div>}
 
-          {renderCollapsibleItem("apoio", <Settings size={18} />, "Apoio", [
+          {renderCollapsibleItem("apoio", <FilePlus size={18} />, "Apoio", [
             { href: "/credor", text: "Credores" },
             { href: "/cliente", text: "Cliente" },
             { href: "/centrocusto", text: "Centro de Custos" },
@@ -279,8 +281,8 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Rodapé Desktop */}
-        <div className="px-3 py-4 mt-auto flex flex-col gap-2 border-t border-gray-200">
-          {renderNavItem("/suporte", <LifeBuoy size={18} />, "Suporte", pathname === "/suporte")}
+        <div className="px-3 py-4 mt-auto flex text-blue-900 flex-col gap-2 border-t border-gray-200">
+          {renderNavItem("/suporte", <CircleHelp size={18} />, "Suporte", pathname === "/suporte")}
           {renderNavItem("/configuracoes", <Settings size={18} />, "Configurações", pathname === "/configuracoes")}
         </div>
       </aside>
@@ -308,7 +310,6 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
               className="bg-transparent outline-none ml-2 w-full text-sm"
             />
           </div>
-
           <div ref={profileRef} className="relative">
             <button
               onClick={() => setProfileOpen(!profileOpen)}
@@ -317,11 +318,11 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
               <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
                 A
               </div>
-              <span className="hidden md:inline text-sm font-medium">Admin</span>
+              <span className="hidden md:inline text-black text-sm font-medium">Admin</span>
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-40 bg-white border rounded-lg shadow-md py-1">
+              <div className="absolute right-0 mt-2 w-40 bg-white text-gray-500 border rounded-lg shadow-md py-1">
                 <a href="/perfil" className="block px-4 py-2 hover:bg-gray-100">
                   Meu Perfil
                 </a>
