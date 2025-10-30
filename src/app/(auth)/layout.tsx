@@ -15,13 +15,10 @@ import {
   ChevronDown,
   ChevronRight,
   Menu,
-  X,
   Search,
   CircleDollarSign,
   HardHat,
   FileStackIcon,
-  PilcrowLeft,
-  AlignJustify,
   ChevronLeft,
 } from "lucide-react";
 
@@ -96,6 +93,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
           relatorioOpen[key] ? <ChevronDown size={16} /> : <ChevronRight size={16} />
         )}
       </button>
+
       {(desktopOpen || mobileOpen) && relatorioOpen[key] && (
         <div className="pl-8 flex flex-col space-y-1">
           {subitems.map((subitem, index) => (
@@ -104,19 +102,20 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                 <div>
                   <button
                     onClick={() => toggleRelatorio(`${key}-${subitem.text}`)}
-                    className="flex items-center justify-between w-full py-1 hover:underline"
+                    className="flex items-center justify-between w-full py-1 px-3 rounded hover:bg-gray-100"
                   >
                     <span>{subitem.text}</span>
                     {relatorioOpen[`${key}-${subitem.text}`] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   </button>
+
                   {relatorioOpen[`${key}-${subitem.text}`] && (
                     <div className="pl-4 flex flex-col space-y-1">
                       {subitem.children.map((child, childIndex) => (
                         <a 
                           key={childIndex} 
                           href={child.href} 
-                          className={`py-1 hover:underline text-sm ${
-                            pathname === child.href ? "text-blue-900 font-semibold" : ""
+                          className={`block px-3 py-2 rounded hover:bg-gray-200 ${
+                            pathname === child.href ? "bg-blue-900 text-white hover:bg-blue-900" : ""
                           }`}
                         >
                           {child.text}
@@ -128,8 +127,8 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
               ) : (
                 <a 
                   href={subitem.href} 
-                  className={`py-1 hover:underline ${
-                    pathname === subitem.href ? "text-blue-900 font-semibold" : ""
+                  className={`block px-3 py-2 rounded hover:bg-gray-200 ${
+                    pathname === subitem.href ? "bg-blue-900 text-white hover:bg-blue-900" : ""
                   }`}
                 >
                   {subitem.text}
@@ -151,13 +150,9 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
         ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex flex-col h-full">
-          {/* ✅ Logo Mobile com imagem */}
+          {/* ✅ Logo Mobile */}
           <div className="px-6 py-4 text-left">
-            <img
-              src="/Unio Plataforma.png"
-              alt="Unio Plataforma"
-              className="h-10 object-contain"
-            />
+            <img src="/Unio Plataforma.png" alt="Unio Plataforma" className="h-10 object-contain" />
           </div>
 
           {/* Menu Mobile */}
@@ -217,13 +212,9 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
         className={`hidden md:flex flex-col h-full bg-white border-r border-gray-200 shadow-md transition-all duration-300
         ${desktopOpen ? "w-64" : "w-16"}`}
       >
-        {/* ✅ Logo Desktop com imagem */}
+        {/* ✅ Logo Desktop */}
         <div className={`flex items-center justify-center py-4 ${desktopOpen ? "px-6" : "px-0"}`}>
-          {desktopOpen ? (
-            <img src="/Unio Plataforma.png" alt="Unio Plataforma" className="h-10 object-contain" />
-          ) : (
-            <img src="/Unio Plataforma.png" alt="Unio Plataforma" className="h-8 object-contain" />
-          )}
+          <img src="/Unio Plataforma.png" alt="Unio Plataforma" className="h-10 object-contain" />
         </div>
 
         <div><br /><br /></div>
@@ -231,7 +222,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
         {/* Menu Desktop */}
         <nav className="flex-1 px-2 space-y-2 text-blue-900 overflow-y-auto">
           {renderNavItem("/home", <Home size={18} />, "Home", pathname === "/home")}
-
+          
           {desktopOpen && <div className="border-t border-gray-200 my-2"></div>}
           {desktopOpen && <div className="text-gray-400 text-xs px-3 uppercase">Módulos</div>}
 
@@ -240,47 +231,50 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
               href: "#", 
               text: "Contas a Receber",
               children: [
-                { href: "/credor", text: "Credor" },
-                { href: "#", text: "Consulta de parcelas" }
+                { href: "/titulos-receber", text: "Títulos a receber" },
+                { href: "/parcelas-receber", text: "Consulta de parcelas" }
               ]
             },
             { 
               href: "#", 
               text: "Contas a Pagar",
               children: [
-                { href: "#", text: "Títulos" },
-                { href: "#", text: "Consulta de parcelas" }
+                { href: "/titulos-pagar", text: "Títulos a Pagar" },
+                { href: "/parcelas-pagar", text: "Consulta de parcelas" }
               ]
             },
             { 
               href: "#", 
               text: "Caixa e Bancos",
               children: [
-                { href: "#", text: "Saldos" },
-                { href: "#", text: "Movimentações" }
+                { href: "/saldos", text: "Saldos" },
+                { href: "/movimentacoes", text: "Movimentações" }
               ]
             }
           ])}
 
           {renderCollapsibleItem("notasfiscais", <FileStackIcon size={18} />, "Notas Fiscais", [
-            { href: "#", text: "Emissão de NF-e" },
-            { href: "#", text: "Emissão de NFS-e" },
-            { href: "#", text: "Recepção de NF-e" },
-            { href: "#", text: "Recepção de NFS-e" },
-            { href: "#", text: "Emissão de CT-e" }
+            { href: "/emissao-nfe", text: "Emissão de NF-e" },
+            { href: "/emissao-nfse", text: "Emissão de NFS-e" },
+            { href: "/recepcao-nfe", text: "Recepção de NF-e" },
+            { href: "/recepcao-nfse", text: "Recepção de NFS-e" },
+            { href: "/emissao-cte", text: "Emissão de CT-e" }
           ])}
 
           {renderCollapsibleItem("engenharia", <HardHat size={18} />, "Engenharia", [
-            { href: "#", text: "Custos Unitários" },
-            { href: "#", text: "Orçamento" }
+            { href: "/custos-unitarios", text: "Custos Unitários" },
+            { href: "/orcamento", text: "Orçamento" }
           ])}
 
           {desktopOpen && <div className="border-t border-gray-200 my-2"></div>}
-          {desktopOpen && <div className="text-gray-400 text-xs px-3 uppercase">Analytics</div>}
+          {desktopOpen && <div className="text-gray-400 text-xs px-3 uppercase">Outros Módulos</div>}
 
-          {renderCollapsibleItem("engenharia", <Settings size={18} />, "Engenharia", [
-            { href: "#", text: "Subitem 1" },
-            { href: "#", text: "Subitem 2" }
+          {renderCollapsibleItem("apoio", <Settings size={18} />, "Apoio", [
+            { href: "/credor", text: "Credores" },
+            { href: "/cliente", text: "Cliente" },
+            { href: "/centrocusto", text: "Centro de Custos" },
+            { href: "/contacorrente", text: "Contas Correntes" },
+            { href: "/empresa", text: "Empresas" }
           ])}
         </nav>
 
@@ -295,15 +289,10 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
-          {/* Hamburger mobile */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="p-2 text-gray-800 md:hidden"
-          >
+          <button onClick={() => setMobileOpen(true)} className="p-2 text-gray-800 md:hidden">
             <Menu size={24} />
           </button>
 
-          {/* Toggle sidebar desktop */}
           <button
             onClick={() => setDesktopOpen(!desktopOpen)}
             className="hidden md:flex p-2 text-gray-800 hover:bg-gray-100 rounded"
@@ -311,7 +300,6 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
             {desktopOpen ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
 
-          {/* Barra de pesquisa */}
           <div className="flex items-center w-full max-w-md bg-gray-100 rounded-lg px-3 py-1 ml-2">
             <Search className="text-gray-500" size={18} />
             <input
@@ -321,7 +309,6 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          {/* Perfil */}
           <div ref={profileRef} className="relative">
             <button
               onClick={() => setProfileOpen(!profileOpen)}

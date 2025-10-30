@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-// ✅ Interface corrigida baseada na resposta real da API
+// Interfaces originais
 interface Credor {
   id: number;
   nome: string;
@@ -13,7 +13,6 @@ interface Credor {
   ativo: string;
 }
 
-// ✅ Interface para a resposta paginada
 interface PagedResult {
   items: Credor[];
   totalCount: number;
@@ -24,245 +23,467 @@ interface PagedResult {
   hasNext: boolean;
 }
 
-// ✅ Função para gerar UUID simples
+// Função utilitária
 function generateSimpleId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
 
-// ✅ Função utilitária de fetch seguro COM HEADERS
+// Fetch seguro
 async function safeFetchJson(url: string): Promise<PagedResult> {
-  try {
-    console.log("🔄 Iniciando fetch para:", url);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        "X-Tenant-Id": "11111111-1111-1111-1111-111111111111",
-        "X-User-Id": "admin",
-        "X-User-Name": "Administrador",
-        "X-Correlation-Id": generateSimpleId(),
-        "Accept-Language": "pt-BR",
-        "Authorization": "Basic " + btoa("admin:admin"),
-        "Content-Type": "application/json",
-        "accept": "application/json",
-      },
-      mode: 'cors',
-    });
-    
-    console.log("📡 Response status:", response.status, response.statusText);
-    
-    if (!response.ok) {
-      throw new Error(`Erro ${response.status}: ${response.statusText}`);
-    }
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-Tenant-Id": "11111111-1111-1111-1111-111111111111",
+      "X-User-Id": "admin",
+      "X-User-Name": "Administrador",
+      "X-Correlation-Id": generateSimpleId(),
+      "Accept-Language": "pt-BR",
+      Authorization: "Basic " + btoa("admin:admin"),
+      "Content-Type": "application/json",
+      accept: "application/json",
+    },
+    mode: "cors",
+  });
 
-    const text = await response.text();
-    console.log("📄 Response text:", text);
-    
-    if (!text) {
-      return { 
-        items: [], 
-        totalCount: 0, 
-        pageNumber: 1, 
-        pageSize: 20, 
-        totalPages: 0, 
-        hasPrevious: false, 
-        hasNext: false 
+  if (!response.ok) throw new Error(`Erro ${response.status}: ${response.statusText}`);
+
+  const text = await response.text();
+  return text
+    ? JSON.parse(text)
+    : {
+        items: [],
+        totalCount: 0,
+        pageNumber: 1,
+        pageSize: 20,
+        totalPages: 0,
+        hasPrevious: false,
+        hasNext: false,
       };
-    }
-
-    const data = JSON.parse(text);
-    console.log("✅ Dados parseados:", data);
-    
-    return data;
-  } catch (err) {
-    console.error("❌ Erro na requisição:", err);
-    throw err;
-  }
 }
 
 export default function CredoresPage() {
   const router = useRouter();
   const [results, setResults] = useState<Credor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchData, setSearchData] = useState({
-    search: "",
-    doc: "",
-    ativo: "",
+  const [searchData, setSearchData] = useState({ search: "", ativo: "", tipo: "" });
+
+  // Estado do modal
+  const [showModal, setShowModal] = useState(false);
+  const [modalStep, setModalStep] = useState(1);
+  const [formData, setFormData] = useState<any>({
+    tipoCredor: "",
+    tipoPessoa: "",
+    cnpjCpf: "",
+    razaoSocial: "",
+    fantasia: "",
+    microempresa: false,
+    transportadora: false,
+    estrangeiro: false,
+    inscricaoEstadual: "",
+    regimeTributacao: "",
+    tipoServico: "",
+    naturezaRendimento: "",
+    cprb: "",
+    associacaoDesportiva: false,
   });
 
-  // ✅ Função para testar a conexão primeiro
-  const testConnection = async () => {
-    try {
-      console.log("🧪 Testando conexão com a API...");
-      const response = await fetch('http://localhost:5103', {
-        method: 'GET',
-        mode: 'cors'
-      });
-      console.log("✅ Servidor respondeu:", response.status);
-      return true;
-    } catch (error) {
-      console.error("❌ Servidor não respondeu:", error);
-      return false;
-    }
-  };
-
+  // Buscar credores
   const handleSearch = async () => {
     setLoading(true);
     try {
-      // ✅ Testa se o servidor está online
-      const isOnline = await testConnection();
-      if (!isOnline) {
-        alert("Servidor não está respondendo. Verifique se a API está rodando na porta 5103.");
-        return;
-      }
-
-      // ✅ Constrói parâmetros conforme a API espera (note o "P" maiúsculo)
-      const params: Record<string, string> = {
-        Page: "1",        // ✅ Com P maiúsculo
-        PageSize: "20"    // ✅ Com P maiúsculo
-      };
-
-      // ✅ Adiciona filtros apenas se preenchidos
-      if (searchData.search) params.search = searchData.search;
-      if (searchData.doc) params.doc = searchData.doc;
-      if (searchData.ativo) params.ativo = searchData.ativo;
-
-      const query = new URLSearchParams(params).toString();
-      const url = `http://localhost:5103/api/v1/credores?${query}`;
-      console.log("🔗 URL completa:", url);
-      
+      const params = new URLSearchParams({
+        Page: "1",
+        PageSize: "10",
+        ...(searchData.search && { search: searchData.search }),
+        ...(searchData.ativo && { ativo: searchData.ativo }),
+        ...(searchData.tipo && { tipo: searchData.tipo }),
+      });
+      const url = `http://localhost:5103/api/v1/credores?${params}`;
       const data = await safeFetchJson(url);
       setResults(data.items || []);
     } catch (error) {
       console.error("Erro ao buscar credores:", error);
-      alert(`Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}\n\nVerifique:\n1. Se a API está rodando\n2. Se a URL está correta\n3. Se não há bloqueio de CORS`);
+      alert("Erro ao buscar credores. Verifique a API.");
       setResults([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Controle de campos
+  const updateField = (field: string, value: any) => {
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = () => {
+    alert("Salvar integração API (POST) aqui");
+    setShowModal(false);
+  };
+
   return (
-    <div className="p-6">
-      {/* Cabeçalho */}
+    <div className="flex flex-col w-full px-8 py-6">
+      {/* Título */}
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl text-black font-bold">Cadastro de Credores</h1>
-          <p className="text-lg text-gray-600">Credores</p>
+        <h1 className="text-2xl font-semibold text-[#0E0E0E]">Credores</h1>
+
+        <div className="flex gap-3">
+          <button className="border border-[#D1D5DB] text-[#111827] px-4 py-2 rounded-lg hover:bg-gray-50 transition">
+            Importar
+          </button>
+          <button
+            className="bg-[#0048B0] text-white px-5 py-2 rounded-lg hover:bg-[#003c90] transition"
+            onClick={() => {
+              setShowModal(true);
+              setModalStep(1);
+            }}
+          >
+            + Novo credor
+          </button>
         </div>
-        <button
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          onClick={() => router.push("/credor/novo")}
-        >
-          Novo
-        </button>
       </div>
 
-      {/* Parâmetros da consulta */}
-      <div className="mb-6 border rounded-lg p-4 bg-gray-50 text-black">
-        <h2 className="text-lg font-semibold text-gray-600 mb-4">Parâmetros da consulta</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Barra de busca */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <div className="flex-1 relative">
           <input
-            placeholder="Buscar por nome, CNPJ ou CPF"
-            className="border rounded p-2"
+            type="text"
+            placeholder="Buscar por nome, e-mail ou código"
+            className="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 text-[15px] text-[#111827] placeholder-gray-300"
             value={searchData.search}
             onChange={(e) => setSearchData({ ...searchData, search: e.target.value })}
           />
-          <input
-            placeholder="Filtrar por CNPJ/CPF"
-            className="border rounded p-2"
-            value={searchData.doc}
-            onChange={(e) => setSearchData({ ...searchData, doc: e.target.value })}
-          />
-          <select
-            className="border rounded p-2"
-            value={searchData.ativo}
-            onChange={(e) => setSearchData({ ...searchData, ativo: e.target.value })}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            <option value="">Todos</option>
-            <option value="S">Ativo</option>
-            <option value="N">Inativo</option>
-          </select>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M21 21l-4.35-4.35M9.5 17A7.5 7.5 0 109.5 2a7.5 7.5 0 000 15z"
+            />
+          </svg>
         </div>
-        <div className="mt-4 flex gap-2">
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
-            onClick={handleSearch}
-            disabled={loading}
-          >
-            {loading ? "Pesquisando..." : "Pesquisar"}
-          </button>
-          <button
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-            onClick={() => {
-              setSearchData({ search: "", doc: "", ativo: "" });
-              setResults([]);
-            }}
-          >
-            Limpar
-          </button>
-        </div>
+
+        <select
+          className="border border-gray-300 rounded-lg px-3 py-2 text-[15px] text-[#111827] bg-white"
+          value={searchData.tipo}
+          onChange={(e) => setSearchData({ ...searchData, tipo: e.target.value })}
+        >
+          <option value="">Tipo de credor</option>
+          <option value="fornecedor">Fornecedor</option>
+          <option value="colaborador">Colaborador</option>
+          <option value="corretor">Corretor</option>
+        </select>
+
+        <select
+          className="border border-gray-300 rounded-lg px-3 py-2 text-[15px] text-[#111827] bg-white"
+          value={searchData.ativo}
+          onChange={(e) => setSearchData({ ...searchData, ativo: e.target.value })}
+        >
+          <option value="">Status</option>
+          <option value="S">Ativo</option>
+          <option value="N">Desativado</option>
+        </select>
+
+        <button
+          onClick={handleSearch}
+          className="bg-[#0048B0] text-white px-4 py-2 rounded-lg hover:bg-[#003c90] transition"
+          disabled={loading}
+        >
+          {loading ? "Pesquisando..." : "Pesquisar"}
+        </button>
       </div>
 
-      {/* Grid de resultados CORRIGIDO */}
-      <div className="overflow-x-auto border rounded-lg text-black">
-  <table className="w-full border-collapse">
-    <thead className="bg-gray-100">
-      <tr>
-        <th className="border px-4 py-2 text-left">Código</th>
-        <th className="border px-4 py-2 text-left">Nome</th>
-        <th className="border px-4 py-2 text-left">Fantasia</th>
-        <th className="border px-4 py-2 text-left">CNPJ</th>
-        <th className="border px-4 py-2 text-left">CPF</th>
-        <th className="border px-4 py-2 text-left">Status</th>
-        <th className="border px-4 py-2 text-left">Ações</th>
+      {/* Tabela */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-[#F9FAFB] text-[#111827] text-sm font-semibold border-b">
+            <tr>
+              <th className="px-6 py-3">Nome fantasia</th>
+              <th className="px-6 py-3">Telefone principal</th>
+              <th className="px-6 py-3">Município/UF</th>
+              <th className="px-6 py-3">CNPJ/CPF</th>
+              <th className="px-6 py-3">Tipo de credor</th>
+              <th className="px-6 py-3">Status</th>
+              <th className="px-6 py-3 text-right">Ações</th>
+            </tr>
+          </thead>
+<tbody className="text-[#111827] text-sm">
+  {loading ? (
+    <tr>
+      <td colSpan={7} className="text-center py-6 text-gray-500">
+        Carregando...
+      </td>
+    </tr>
+  ) : results.length === 0 ? (
+    <tr>
+      <td colSpan={7} className="text-center py-6 text-gray-400">
+        Nenhum registro encontrado
+      </td>
+    </tr>
+  ) : (
+    results.map((c) => (
+      <tr key={c.id} className="hover:bg-gray-50 border-b last:border-none">
+        <td className="px-6 py-3">{c.fantasia || c.nome}</td>
+        <td className="px-6 py-3">(--) ---- ----</td>
+        <td className="px-6 py-3">Cidade/UF</td>
+        <td className="px-6 py-3">{c.cnpj || c.cpf}</td>
+        <td className="px-6 py-3">Fornecedor</td>
+        <td className="px-6 py-3">
+          {c.ativo === "S" ? (
+            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
+              Ativo
+            </span>
+          ) : (
+            <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+              Desativado
+            </span>
+          )}
+        </td>
+        <td className="px-6 py-3 text-right">
+          <button className="text-gray-600 hover:text-[#0048B0]">•••</button>
+        </td>
       </tr>
-    </thead>
-    <tbody>
-      {loading ? (
-        <tr>
-          <td colSpan={7} className="border px-4 py-6 text-center text-gray-300">
-            <div className="flex justify-center items-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-              Carregando...
-            </div>
-          </td>
-        </tr>
-      ) : results.length === 0 ? (
-        <tr>
-          <td colSpan={7} className="border px-4 py-6 text-center text-gray-300">
-            Nenhum registro encontrado
-          </td>
-        </tr>
-      ) : (
-        results.map((item) => (
-          <tr key={item.id} className="hover:bg-gray-50">
-            <td className="border px-4 py-2">{item.id}</td>
-            <td className="border px-4 py-2">{item.nome || "-"}</td>
-            <td className="border px-4 py-2">{item.fantasia || "-"}</td>
-            <td className="border px-4 py-2">{item.cnpj || "-"}</td>
-            <td className="border px-4 py-2">{item.cpf || "-"}</td>
-            <td className="border px-4 py-2">
-              {item.ativo === 'S' ? 'Ativo' : item.ativo === 'N' ? 'Inativo' : 'Desconhecido'}
-            </td>
-            <td className="border px-4 py-2">
+    ))
+  )}
+</tbody>
+        </table>
+      </div>
+
+      {/* ===== MODAL DE CADASTRO ===== */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white w-full max-w-2xl rounded-lg shadow-xl p-6 animate-fadeIn">
+            {/* Cabeçalho */}
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <h2 className="text-xl font-semibold text-[#111827]">Novo credor</h2>
+                <p className="text-sm text-[#6B7280]">
+                  Preencha os dados para criar um novo credor no sistema.
+                </p>
+              </div>
               <button
-                className="text-blue-600 hover:underline"
-                onClick={() => router.push(`/credor/editar/${item.id}`)}
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
               >
-                Editar
+                ×
               </button>
-            </td>
-          </tr>
-        ))
+            </div>
+
+            {/* Etapa e progresso */}
+            <p className="text-sm text-[#0048B0] mb-1">
+              Etapa {modalStep}/2
+            </p>
+            <div className="h-1 bg-gray-200 rounded-full mb-5">
+              <div
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  modalStep === 1 ? "w-1/2 bg-[#0048B0]" : "w-full bg-[#0048B0]"
+                }`}
+              ></div>
+            </div>
+
+            {/* Conteúdo Etapa 1 */}
+            {modalStep === 1 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-[#111827] mb-2">Identificação</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">Tipo de credor*</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      value={formData.tipoCredor}
+                      onChange={(e) => updateField("tipoCredor", e.target.value)}
+                    >
+                      <option value="">Selecione</option>
+                      <option value="fornecedor">Fornecedor</option>
+                      <option value="colaborador">Colaborador</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">Tipo de pessoa*</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      value={formData.tipoPessoa}
+                      onChange={(e) => updateField("tipoPessoa", e.target.value)}
+                    >
+                      <option value="">Selecione</option>
+                      <option value="fisica">Física</option>
+                      <option value="juridica">Jurídica</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">CNPJ/CPF*</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Digite"
+                      value={formData.cnpjCpf}
+                      onChange={(e) => updateField("cnpjCpf", e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">
+                      Razão Social/Nome*
+                    </label>
+                    <input
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Digite"
+                      value={formData.razaoSocial}
+                      onChange={(e) => updateField("razaoSocial", e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">Fantasia*</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Digite"
+                      value={formData.fantasia}
+                      onChange={(e) => updateField("fantasia", e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Checkboxes */}
+                <div className="flex gap-6 mt-2">
+                  <label className="flex items-center gap-2 text-sm text-[#111827]">
+                    <input
+                      type="checkbox"
+                      checked={formData.microempresa}
+                      onChange={(e) => updateField("microempresa", e.target.checked)}
+                    />
+                    Microempresa
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[#111827]">
+                    <input
+                      type="checkbox"
+                      checked={formData.transportadora}
+                      onChange={(e) => updateField("transportadora", e.target.checked)}
+                    />
+                    Transportadora
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-[#111827]">
+                    <input
+                      type="checkbox"
+                      checked={formData.estrangeiro}
+                      onChange={(e) => updateField("estrangeiro", e.target.checked)}
+                    />
+                    Estrangeiro
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Conteúdo Etapa 2 */}
+            {modalStep === 2 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-[#111827] mb-2">Fiscal</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">Inscrição estadual*</label>
+                    <input
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Digite"
+                      value={formData.inscricaoEstadual}
+                      onChange={(e) => updateField("inscricaoEstadual", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">Regime de tributação*</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      value={formData.regimeTributacao}
+                      onChange={(e) => updateField("regimeTributacao", e.target.value)}
+                    >
+                      <option value="">Selecione</option>
+                      <option value="simples">Simples Nacional</option>
+                      <option value="lucro_presumido">Lucro Presumido</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-[#111827]">Tipo de serviço preponderante*</label>
+                  <select
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={formData.tipoServico}
+                    onChange={(e) => updateField("tipoServico", e.target.value)}
+                  >
+                    <option value="">Selecione</option>
+                    <option value="servico">Serviço</option>
+                    <option value="comercio">Comércio</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-[#111827]">Natureza do rendimento</label>
+                  <input
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    placeholder="Digite"
+                    value={formData.naturezaRendimento}
+                    onChange={(e) => updateField("naturezaRendimento", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-[#111827]">CPRB (anos)*</label>
+                  <input
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    placeholder="Digite"
+                    value={formData.cprb}
+                    onChange={(e) => updateField("cprb", e.target.value)}
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-[#111827] mt-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.associacaoDesportiva}
+                    onChange={(e) => updateField("associacaoDesportiva", e.target.checked)}
+                  />
+                  Associação desportiva
+                </label>
+              </div>
+            )}
+
+            {/* Rodapé do modal */}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowModal(false)}
+                className="border border-gray-300 px-4 py-2 rounded-md text-[#111827]"
+              >
+                Cancelar
+              </button>
+              {modalStep === 1 ? (
+                <button
+                  onClick={() => setModalStep(2)}
+                  className="bg-[#0048B0] text-white px-5 py-2 rounded-md hover:bg-[#003c90]"
+                >
+                  Próximo
+                </button>
+              ) : (
+                <button
+                  onClick={handleSave}
+                  className="bg-[#0048B0] text-white px-5 py-2 rounded-md hover:bg-[#003c90]"
+                >
+                  Salvar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
-    </tbody>
-  </table>
-</div>
     </div>
   );
 }
