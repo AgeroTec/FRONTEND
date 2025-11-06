@@ -1,124 +1,169 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
-// Interfaces originais
-interface Credor {
-  id: number;
-  nome: string;
-  fantasia: string | null;
-  cnpj: string | null;
-  cpf: string | null;
+import { credorService } from "@/application/services/CredorService";
+import { Credor } from "@/domain/entities/Credor";
+import { CredorSearchInput } from "@/domain/schemas/credorSchemas";
+
+type FilterState = {
+  search: string;
+  doc: string;
   ativo: string;
-}
+};
 
-interface PagedResult {
-  items: Credor[];
-  totalCount: number;
-  pageNumber: number;
-  pageSize: number;
-  totalPages: number;
-  hasPrevious: boolean;
-  hasNext: boolean;
-}
+type FormState = {
+  tipoCredor: string;
+  tipoPessoa: string;
+  cnpjCpf: string;
+  razaoSocial: string;
+  fantasia: string;
+  microempresa: boolean;
+  transportadora: boolean;
+  estrangeiro: boolean;
+  inscricaoEstadual: string;
+  regimeTributacao: string;
+  tipoServico: string;
+  naturezaRendimento: string;
+  cprb: string;
+  associacaoDesportiva: boolean;
+  ativo: "S" | "N";
+};
 
-// Função utilitária
-function generateSimpleId(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+const DEFAULT_PAGE_SIZE = 10;
 
-// Fetch seguro
-async function safeFetchJson(url: string): Promise<PagedResult> {
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "X-Tenant-Id": "f0e25b5a-598d-4bb9-942f-5f6710cb200a",
-      "X-Correlation-Id": generateSimpleId(),
-      "Accept-Language": "pt-BR",
-      "Content-Type": "application/json",
-      accept: "application/json",
-    },
-    mode: "cors",
-  });
+const createInitialFilters = (): FilterState => ({
+  search: "",
+  doc: "",
+  ativo: "",
+});
 
-  if (!response.ok) throw new Error(`Erro ${response.status}: ${response.statusText}`);
-
-  const text = await response.text();
-  return text
-    ? JSON.parse(text)
-    : {
-        items: [],
-        totalCount: 0,
-        pageNumber: 1,
-        pageSize: 20,
-        totalPages: 0,
-        hasPrevious: false,
-        hasNext: false,
-      };
-}
+const createInitialFormState = (): FormState => ({
+  tipoCredor: "",
+  tipoPessoa: "",
+  cnpjCpf: "",
+  razaoSocial: "",
+  fantasia: "",
+  microempresa: false,
+  transportadora: false,
+  estrangeiro: false,
+  inscricaoEstadual: "",
+  regimeTributacao: "",
+  tipoServico: "",
+  naturezaRendimento: "",
+  cprb: "",
+  associacaoDesportiva: false,
+  ativo: "S",
+});
 
 export default function CredoresPage() {
-  const router = useRouter();
   const [results, setResults] = useState<Credor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchData, setSearchData] = useState({ search: "", ativo: "", tipo: "" });
+  const [filters, setFilters] = useState<FilterState>(() => createInitialFilters());
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    total: 0,
+  });
+  const [saving, setSaving] = useState(false);
 
   // Estado do modal
   const [showModal, setShowModal] = useState(false);
   const [modalStep, setModalStep] = useState(1);
-  const [formData, setFormData] = useState<any>({
-    tipoCredor: "",
-    tipoPessoa: "",
-    cnpjCpf: "",
-    razaoSocial: "",
-    fantasia: "",
-    microempresa: false,
-    transportadora: false,
-    estrangeiro: false,
-    inscricaoEstadual: "",
-    regimeTributacao: "",
-    tipoServico: "",
-    naturezaRendimento: "",
-    cprb: "",
-    associacaoDesportiva: false,
-  });
+  const [formData, setFormData] = useState<FormState>(() => createInitialFormState());
 
-  // Buscar credores
-  const handleSearch = async () => {
+  const executeSearch = useCallback(async (params: CredorSearchInput) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        Page: "1",
-        PageSize: "10",
-        ...(searchData.search && { search: searchData.search }),
-        ...(searchData.ativo && { ativo: searchData.ativo }),
-        ...(searchData.tipo && { tipo: searchData.tipo }),
+      const response = await credorService.search.execute(params);
+      setResults(response.items);
+      setPagination({
+        page: response.page,
+        pageSize: response.pageSize,
+        total: response.total,
       });
-      const url = `http://localhost:5103/api/v1/credores?${params}`;
-      const data = await safeFetchJson(url);
-      setResults(data.items || []);
     } catch (error) {
       console.error("Erro ao buscar credores:", error);
-      alert("Erro ao buscar credores. Verifique a API.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Erro ao buscar credores. Verifique a API.";
+      alert(message);
       setResults([]);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const buildSearchParams = (pageOverride?: number): CredorSearchInput => {
+    const payload: CredorSearchInput = {
+      page: pageOverride ?? pagination.page,
+      pageSize: pagination.pageSize,
+    };
+
+    if (filters.search.trim()) {
+      payload.search = filters.search.trim();
+    }
+
+    if (filters.doc.trim()) {
+      payload.doc = filters.doc.trim();
+    }
+
+    if (filters.ativo) {
+      payload.ativo = filters.ativo;
+    }
+
+    return payload;
   };
 
-  // Controle de campos
-  const updateField = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  const handleSearch = async () => {
+    await executeSearch(buildSearchParams(1));
   };
 
-  const handleSave = () => {
-    alert("http://localhost:5103/api/v1/credores");
+  useEffect(() => {
+    void executeSearch({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
+  }, [executeSearch]);
+
+  const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const resetForm = () => {
+    setFormData(createInitialFormState());
+    setModalStep(1);
+  };
+
+  const handleOpenModal = () => {
+    resetForm();
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
     setShowModal(false);
+    resetForm();
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await credorService.create.execute({
+        nome: formData.razaoSocial,
+        fantasia: formData.fantasia || undefined,
+        cnpj: formData.tipoPessoa === "juridica" ? formData.cnpjCpf : undefined,
+        cpf: formData.tipoPessoa === "fisica" ? formData.cnpjCpf : undefined,
+        ativo: formData.ativo,
+      });
+      alert("Credor cadastrado com sucesso!");
+      handleCloseModal();
+      await executeSearch(buildSearchParams(1));
+    } catch (error) {
+      console.error("Erro ao salvar credor:", error);
+      const message =
+        error instanceof Error ? error.message : "Erro ao salvar credor.";
+      alert(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -133,10 +178,7 @@ export default function CredoresPage() {
           </button>
           <button
             className="bg-[#0048B0] text-white px-5 py-2 rounded-lg hover:bg-[#003c90] transition"
-            onClick={() => {
-              setShowModal(true);
-              setModalStep(1);
-            }}
+            onClick={handleOpenModal}
           >
             + Novo credor
           </button>
@@ -145,13 +187,15 @@ export default function CredoresPage() {
 
       {/* Barra de busca */}
       <div className="flex flex-wrap gap-3 mb-6">
-        <div className="flex-1 relative">
+        <div className="flex-1 min-w-[220px] relative">
           <input
             type="text"
             placeholder="Buscar por nome, e-mail ou código"
             className="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 text-[15px] text-[#111827] placeholder-gray-300"
-            value={searchData.search}
-            onChange={(e) => setSearchData({ ...searchData, search: e.target.value })}
+            value={filters.search}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, search: e.target.value }))
+            }
           />
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -169,21 +213,24 @@ export default function CredoresPage() {
           </svg>
         </div>
 
-        <select
-          className="border border-gray-300 rounded-lg px-3 py-2 text-[15px] text-[#111827] bg-white"
-          value={searchData.tipo}
-          onChange={(e) => setSearchData({ ...searchData, tipo: e.target.value })}
-        >
-          <option value="">Tipo de credor</option>
-          <option value="fornecedor">Fornecedor</option>
-          <option value="colaborador">Colaborador</option>
-          <option value="corretor">Corretor</option>
-        </select>
+        <div className="w-full sm:w-64">
+          <input
+            type="text"
+            placeholder="Documento (CPF/CNPJ)"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[15px] text-[#111827] placeholder-gray-300"
+            value={filters.doc}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, doc: e.target.value }))
+            }
+          />
+        </div>
 
         <select
           className="border border-gray-300 rounded-lg px-3 py-2 text-[15px] text-[#111827] bg-white"
-          value={searchData.ativo}
-          onChange={(e) => setSearchData({ ...searchData, ativo: e.target.value })}
+          value={filters.ativo}
+          onChange={(e) =>
+            setFilters((prev) => ({ ...prev, ativo: e.target.value }))
+          }
         >
           <option value="">Status</option>
           <option value="S">Ativo</option>
@@ -268,7 +315,7 @@ export default function CredoresPage() {
                 </p>
               </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={handleCloseModal}
                 className="text-gray-400 hover:text-gray-600 text-xl"
               >
                 ×
@@ -349,6 +396,19 @@ export default function CredoresPage() {
                       value={formData.fantasia}
                       onChange={(e) => updateField("fantasia", e.target.value)}
                     />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-[#111827]">Status*</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      value={formData.ativo}
+                      onChange={(e) =>
+                        updateField("ativo", e.target.value as FormState["ativo"])
+                      }
+                    >
+                      <option value="S">Ativo</option>
+                      <option value="N">Desativado</option>
+                    </select>
                   </div>
                 </div>
 
@@ -457,7 +517,7 @@ export default function CredoresPage() {
             {/* Rodapé do modal */}
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => setShowModal(false)}
+                onClick={handleCloseModal}
                 className="border border-gray-300 px-4 py-2 rounded-md text-[#111827]"
               >
                 Cancelar
@@ -472,9 +532,12 @@ export default function CredoresPage() {
               ) : (
                 <button
                   onClick={handleSave}
-                  className="bg-[#0048B0] text-white px-5 py-2 rounded-md hover:bg-[#003c90]"
+                  disabled={saving}
+                  className={`bg-[#0048B0] text-white px-5 py-2 rounded-md transition ${
+                    saving ? "opacity-60 cursor-not-allowed" : "hover:bg-[#003c90]"
+                  }`}
                 >
-                  Salvar
+                  {saving ? "Salvando..." : "Salvar"}
                 </button>
               )}
             </div>

@@ -3,35 +3,54 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { credorService } from "@/application/services/CredorService";
+
+type FormState = {
+  nome: string;
+  fantasia: string;
+  documento: string;
+  tipoPessoa: "fisica" | "juridica";
+  ativo: "S" | "N";
+};
+
+const createInitialFormState = (): FormState => ({
+  nome: "",
+  fantasia: "",
+  documento: "",
+  tipoPessoa: "juridica",
+  ativo: "S",
+});
+
 export default function NovoCredorPage() {
   const router = useRouter();
+  const [formData, setFormData] = useState<FormState>(() => createInitialFormState());
+  const [saving, setSaving] = useState(false);
 
-  const [formData, setFormData] = useState({
-    codigo: "",
-    razaoSocial: "",
-    nomeFantasia: "",
-    municipio: "",
-    uf: "",
-    cnpjCpf: "",
-    tipo: "",
-  });
+  const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
+    setSaving(true);
     try {
-      const response = await fetch("http://192.168.1.100:5103/api/v1/credores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      await credorService.create.execute({
+        nome: formData.nome,
+        fantasia: formData.fantasia || undefined,
+        cnpj: formData.tipoPessoa === "juridica" ? formData.documento : undefined,
+        cpf: formData.tipoPessoa === "fisica" ? formData.documento : undefined,
+        ativo: formData.ativo,
       });
 
-      if (!response.ok) throw new Error("Erro ao salvar credor");
-
       alert("Credor cadastrado com sucesso!");
-      router.push("/credor"); // volta para a lista
+      router.push("/credor");
     } catch (error) {
-      alert("Erro ao salvar credor: " + error);
+      console.error("Erro ao salvar credor:", error);
+      const message = error instanceof Error ? error.message : "Erro ao salvar credor.";
+      alert(message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -40,66 +59,88 @@ export default function NovoCredorPage() {
       <h1 className="text-2xl font-bold mb-6">Novo Credor</h1>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <input
-          className="border rounded p-2"
-          placeholder="Código (opcional)"
-          value={formData.codigo}
-          onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-        />
-        <input
-          className="border rounded p-2"
-          placeholder="Razão Social / Nome"
-          value={formData.razaoSocial}
-          onChange={(e) => setFormData({ ...formData, razaoSocial: e.target.value })}
-          required
-        />
-        <input
-          className="border rounded p-2"
-          placeholder="Nome Fantasia"
-          value={formData.nomeFantasia}
-          onChange={(e) => setFormData({ ...formData, nomeFantasia: e.target.value })}
-        />
-        <input
-          className="border rounded p-2"
-          placeholder="Município"
-          value={formData.municipio}
-          onChange={(e) => setFormData({ ...formData, municipio: e.target.value })}
-        />
-        <input
-          className="border rounded p-2"
-          placeholder="UF"
-          value={formData.uf}
-          onChange={(e) => setFormData({ ...formData, uf: e.target.value })}
-        />
-        <input
-          className="border rounded p-2"
-          placeholder="CPF / CNPJ"
-          value={formData.cnpjCpf}
-          onChange={(e) => setFormData({ ...formData, cnpjCpf: e.target.value })}
-        />
-        <select
-          className="border rounded p-2"
-          value={formData.tipo}
-          onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
-          required
-        >
-          <option value="fornecedor">Fornecedor</option>
-          <option value="colaborador">Colaborador</option>
-        </select>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-[#111827] mb-1">
+            Razão social / Nome*
+          </label>
+          <input
+            className="w-full border border-gray-300 rounded-md px-3 py-2"
+            placeholder="Digite o nome"
+            value={formData.nome}
+            onChange={(event) => updateField("nome", event.target.value)}
+            required
+          />
+        </div>
 
-        <div className="col-span-full flex justify-end gap-2 mt-4">
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-[#111827] mb-1">
+            Nome fantasia
+          </label>
+          <input
+            className="w-full border border-gray-300 rounded-md px-3 py-2"
+            placeholder="Digite o nome fantasia"
+            value={formData.fantasia}
+            onChange={(event) => updateField("fantasia", event.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#111827] mb-1">
+            Tipo de pessoa*
+          </label>
+          <select
+            className="w-full border border-gray-300 rounded-md px-3 py-2"
+            value={formData.tipoPessoa}
+            onChange={(event) =>
+              updateField("tipoPessoa", event.target.value as FormState["tipoPessoa"])
+            }
+          >
+            <option value="juridica">Jurídica</option>
+            <option value="fisica">Física</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#111827] mb-1">
+            Documento*
+          </label>
+          <input
+            className="w-full border border-gray-300 rounded-md px-3 py-2"
+            placeholder={formData.tipoPessoa === "juridica" ? "CNPJ" : "CPF"}
+            value={formData.documento}
+            onChange={(event) => updateField("documento", event.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#111827] mb-1">Status*</label>
+          <select
+            className="w-full border border-gray-300 rounded-md px-3 py-2"
+            value={formData.ativo}
+            onChange={(event) => updateField("ativo", event.target.value as FormState["ativo"])}
+          >
+            <option value="S">Ativo</option>
+            <option value="N">Desativado</option>
+          </select>
+        </div>
+
+        <div className="md:col-span-2 flex justify-end gap-2 mt-4">
           <button
             type="button"
             onClick={() => router.push("/credor")}
-            className="px-4 py-2 rounded border"
+            className="px-4 py-2 rounded-md border border-gray-300 text-[#111827]"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+            disabled={saving}
+            className={`px-4 py-2 rounded-md text-white transition ${
+              saving ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+            }`}
           >
-            Salvar
+            {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </form>
