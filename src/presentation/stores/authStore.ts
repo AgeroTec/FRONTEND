@@ -5,8 +5,29 @@ import { authService } from "@/application/services/AuthService";
 import { AuthUser } from "@/domain/entities/AuthUser";
 import { AuthTokens } from "@/domain/valueObjects/AuthTokens";
 
-const persistTokenMetadata = (tokens: AuthTokens): void => {
+const AUTH_STORAGE_KEY = "auth-storage";
+
+interface AuthState {
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  tokens: AuthTokens | null;
+  login: (login: string, senha: string) => Promise<void>;
+  logout: () => Promise<void>;
+  checkAuth: () => boolean;
+  isTokenExpired: () => boolean;
+}
+
+type AuthPersistedState = Pick<AuthState, "user" | "isAuthenticated" | "tokens">;
+
+const setTokenMetadata = (tokens: AuthTokens | null): void => {
   if (typeof window === "undefined") return;
+
+  if (!tokens) {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("tokenType");
+    localStorage.removeItem("tokenExpiration");
+    return;
+  }
 
   localStorage.setItem("accessToken", tokens.accessToken);
   localStorage.setItem("tokenType", tokens.tokenType);
@@ -22,24 +43,37 @@ const persistTokenMetadata = (tokens: AuthTokens): void => {
   }
 };
 
-const clearTokenMetadata = (): void => {
-  if (typeof window === "undefined") return;
+const syncAuthCookie = (state: AuthPersistedState): void => {
+  if (typeof document === "undefined") return;
 
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("tokenType");
-  localStorage.removeItem("tokenExpiration");
-  localStorage.removeItem("auth-storage");
+  const payload = {
+    state: {
+      user: state.user,
+      isAuthenticated: state.isAuthenticated,
+      tokens: state.tokens,
+    },
+    version: 0,
+  };
+
+  const encodedPayload = encodeURIComponent(JSON.stringify(payload));
+  const maxAge = state.tokens?.expiresIn && state.tokens.expiresIn > 0 ? state.tokens.expiresIn : undefined;
+
+  document.cookie = `${AUTH_STORAGE_KEY}=${encodedPayload}; path=/; SameSite=Lax${
+    maxAge ? `; Max-Age=${maxAge}` : ""
+  }`;
 };
 
-interface AuthState {
-  user: AuthUser | null;
-  isAuthenticated: boolean;
-  tokens: AuthTokens | null;
-  login: (login: string, senha: string) => Promise<void>;
-  logout: () => Promise<void>;
-  checkAuth: () => boolean;
-  isTokenExpired: () => boolean;
-}
+const clearAuthCookie = (): void => {
+  if (typeof document === "undefined") return;
+
+  document.cookie = `${AUTH_STORAGE_KEY}=; path=/; Max-Age=0; SameSite=Lax`;
+};
+
+const clearAuthMetadata = (): void => {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+};
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -58,10 +92,18 @@ export const useAuthStore = create<AuthState>()(
             tokens: response.tokens
           });
 
-          persistTokenMetadata(response.tokens);
+          const currentState = get();
+          setTokenMetadata(currentState.tokens);
+          syncAuthCookie({
+            user: currentState.user,
+            isAuthenticated: currentState.isAuthenticated,
+            tokens: currentState.tokens,
+          });
         } catch (error) {
           set({ user: null, isAuthenticated: false, tokens: null });
-          clearTokenMetadata();
+          setTokenMetadata(null);
+          clearAuthCookie();
+          clearAuthMetadata();
 
           if (error instanceof Error) {
             throw error;
@@ -77,7 +119,9 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error("Erro ao realizar logout:", error);
         } finally {
-          clearTokenMetadata();
+          setTokenMetadata(null);
+          clearAuthCookie();
+          clearAuthMetadata();
           set({ user: null, isAuthenticated: false, tokens: null });
         }
       },
@@ -90,7 +134,9 @@ export const useAuthStore = create<AuthState>()(
         }
 
         if (state.isTokenExpired()) {
-          clearTokenMetadata();
+          setTokenMetadata(null);
+          clearAuthCookie();
+          clearAuthMetadata();
           set({ user: null, isAuthenticated: false, tokens: null });
           return false;
         }
@@ -112,12 +158,22 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: "auth-storage",
+      name: AUTH_STORAGE_KEY,
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         tokens: state.tokens,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+
+        setTokenMetadata(state.tokens);
+        syncAuthCookie({
+          user: state.user,
+          isAuthenticated: state.isAuthenticated,
+          tokens: state.tokens,
+        });
+      },
     }
   )
 );
