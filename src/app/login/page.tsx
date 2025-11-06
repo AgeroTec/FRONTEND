@@ -12,7 +12,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const loginStore = useAuthStore((s) => s.login);
-  const setTokens = useAuthStore((s) => s.tokens);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,19 +19,26 @@ export default function LoginPage() {
     setErro("");
 
     try {
+      // tenta login
       await loginStore(usuario, senha);
 
-      // Persistência opcional: se marcar "Lembrar de mim", salva no localStorage
+      // salva se "lembrar" estiver marcado
       if (lembrar) {
         const authState = useAuthStore.getState();
-        localStorage.setItem("auth-store", JSON.stringify({
-          user: authState.user,
-          isAuthenticated: true,
-          tokens: authState.tokens,
-        }));
+        localStorage.setItem(
+          "auth-store",
+          JSON.stringify({
+            user: authState.user,
+            isAuthenticated: true,
+            tokens: authState.tokens,
+          })
+        );
       }
 
-      router.push("/home");
+      // 🔁 Aguarda atualização do estado antes de redirecionar
+      setTimeout(() => {
+        router.push("/home"); // ← se sua rota estiver em (auth)/home, use "/home"
+      }, 200);
     } catch (err) {
       if (err instanceof Error) {
         setErro(err.message);
@@ -58,9 +64,7 @@ export default function LoginPage() {
             <h2 className="text-4xl font-bold mb-4">
               Parceria de crescimento e desenvolvimento.
             </h2>
-            <p className="text-blue-100 text-lg">
-              Tela para desenvolvimento.
-            </p>
+            <p className="text-blue-100 text-lg">Tela para desenvolvimento.</p>
           </div>
 
           <div className="text-sm text-blue-300">
@@ -77,7 +81,8 @@ export default function LoginPage() {
               Bem-vindo de volta
             </h1>
             <p className="text-gray-600">
-              Entre para acessar todas as ferramentas da plataforma que une crescimento e inovação.
+              Entre para acessar todas as ferramentas da plataforma que une
+              crescimento e inovação.
             </p>
           </div>
 
@@ -122,7 +127,10 @@ export default function LoginPage() {
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   disabled={loading}
                 />
-                <label htmlFor="lembrar" className="ml-2 block text-sm text-gray-700">
+                <label
+                  htmlFor="lembrar"
+                  className="ml-2 block text-sm text-gray-700"
+                >
                   Lembrar de mim
                 </label>
               </div>
@@ -135,7 +143,9 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {erro && <p className="text-red-500 text-sm text-center">{erro}</p>}
+            {erro && (
+              <p className="text-red-500 text-sm text-center">{erro}</p>
+            )}
 
             <button
               type="submit"

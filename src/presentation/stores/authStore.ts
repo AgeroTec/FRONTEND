@@ -1,6 +1,7 @@
 // src/presentation/stores/authStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { apiFetch } from "@/infrastructure/http/apiClient";
 
 interface User {
   id: string;
@@ -16,6 +17,7 @@ interface AuthTokens {
   idToken: string | null;
   scope: string;
   issuedAt: string;
+  [key: string]: any;
 }
 
 interface AuthState {
@@ -27,9 +29,6 @@ interface AuthState {
   checkAuth: () => boolean;
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5103/api/v1";
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -39,57 +38,49 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (login: string, senha: string) => {
         try {
-          const res = await fetch(`${API_BASE_URL}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ login, senha }),
-          });
+          // Faz login
+          const tokens = await apiFetch<AuthTokens>(
+            "/auth/login",
+            {
+              method: "POST",
+              body: JSON.stringify({ login, senha }),
+            },
+            true
+          );
 
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            const msg = err?.message || err?.detail || "Usuário ou senha inválidos";
-            throw new Error(msg);
-          }
+          if (!tokens?.accessToken)
+            throw new Error("A resposta não contém accessToken.");
 
-          const tokens: AuthTokens = await res.json();
-
-          // Tenta buscar dados do usuário real (endpoint opcional /auth/me)
+          // Busca o usuário (se existir o endpoint /auth/me)
           let user: User | null = null;
           try {
-            const meRes = await fetch(`${API_BASE_URL}/auth/me`, {
-              headers: {
-                Authorization: `${tokens.tokenType} ${tokens.accessToken}`,
-              },
-            });
-
-            if (meRes.ok) {
-              // espera que /auth/me retorne algo como { id, email, name }
-              user = await meRes.json();
-            } else {
-              // fallback simples caso não exista /auth/me
-              user = {
-                id: "1",
-                email: login.includes("@") ? login : `${login}@sistema.com`,
-                name: login,
-              };
-            }
+            user = await apiFetch<User>("/auth/me");
           } catch {
             user = {
               id: "1",
-              email: login.includes("@") ? login : `${login}@sistema.com`,
-              name: login,
+              email: login,
+              name: login.split("@")[0],
             };
           }
 
-          set({ user, isAuthenticated: true, tokens });
-        } catch (error) {
-          if (error instanceof Error) throw new Error(error.message);
-          throw new Error("Erro desconhecido ao fazer login");
+          set({
+            user,
+            tokens,
+            isAuthenticated: true,
+          });
+        } catch (err) {
+          if (err instanceof Error) throw new Error(err.message);
+          throw new Error("Erro ao autenticar usuário.");
         }
       },
 
       logout: () => {
-        set({ user: null, isAuthenticated: false, tokens: null });
+        set({
+          user: null,
+          tokens: null,
+          isAuthenticated: false,
+        });
+        localStorage.removeItem("auth-storage");
       },
 
       checkAuth: () => {

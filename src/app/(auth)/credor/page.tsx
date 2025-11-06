@@ -37,12 +37,9 @@ async function safeFetchJson(url: string): Promise<PagedResult> {
   const response = await fetch(url, {
     method: "GET",
     headers: {
-      "X-Tenant-Id": "11111111-1111-1111-1111-111111111111",
-      "X-User-Id": "admin",
-      "X-User-Name": "Administrador",
+      "X-Tenant-Id": "f0e25b5a-598d-4bb9-942f-5f6710cb200a",
       "X-Correlation-Id": generateSimpleId(),
       "Accept-Language": "pt-BR",
-      Authorization: "Basic " + btoa("admin:admin"),
       "Content-Type": "application/json",
       accept: "application/json",
     },
@@ -120,7 +117,7 @@ export default function CredoresPage() {
   };
 
   const handleSave = () => {
-    alert("Salvar integração API (POST) aqui");
+    alert("http://localhost:5103/api/v1/credores");
     setShowModal(false);
   };
 

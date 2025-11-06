@@ -20,7 +20,7 @@ export function AuthGuard({ children }: Props) {
       router.replace("/login");
     }
     if (isAuth && pathname === "/login") {
-      router.replace("/credores");
+      router.replace("/home");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, pathname]);
