@@ -2,19 +2,20 @@
  * HTTP Client
  *
  * Cliente HTTP centralizado usando Axios.
- * Substitui todas as chamadas fetch() manuais espalhadas pelo código.
- *
- * Benefícios:
  * - Headers automáticos (X-Tenant-Id, Authorization, X-Correlation-Id)
- * - Interceptors para refresh token e tratamento de erros
- * - Tipagem TypeScript completa
- * - Logging centralizado
- * - Retry logic (futuro)
+ * - Interceptors para redirecionar ao /login em 401/403/ERR_NETWORK
+ * - Logging seguro (string) para o overlay do Next
+ * - Tipagem TS correta (AxiosHeaders)
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
-import { API_CONFIG, TENANT_CONFIG } from './apiConfig';
-import { v4 as uuidv4 } from 'uuid';
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosHeaders,
+  isAxiosError,
+} from "axios";
+import { API_CONFIG, TENANT_CONFIG } from "./apiConfig";
+import { v4 as uuidv4 } from "uuid";
 
 interface PersistedAuthTokens {
   accessToken?: string;
@@ -40,10 +41,20 @@ export class HttpClient {
   private client: AxiosInstance;
 
   constructor() {
+    // Base URL (sempre pública no front)
+    const envBase =
+      typeof process.env.NEXT_PUBLIC_API_BASE_URL === "string" &&
+      process.env.NEXT_PUBLIC_API_BASE_URL.trim() !== ""
+        ? process.env.NEXT_PUBLIC_API_BASE_URL
+        : undefined;
+
+    const baseURL =
+      envBase || API_CONFIG.baseURL || "http://localhost:5103/api/v1";
+
     this.client = axios.create({
-      baseURL: API_CONFIG.baseURL,
-      timeout: API_CONFIG.timeout,
-      headers: API_CONFIG.headers,
+      baseURL,
+      timeout: API_CONFIG.timeout || 15000,
+      headers: API_CONFIG.headers || { Accept: "application/json" },
     });
 
     this.setupInterceptors();
@@ -53,58 +64,103 @@ export class HttpClient {
    * Configura interceptors para request e response
    */
   private setupInterceptors(): void {
-    // Request interceptor - adiciona headers automáticos
+    // Request: injeta headers padrão
     this.client.interceptors.request.use(
       (config) => {
-        const headers = (config.headers ?? {}) as Record<string, string>;
+        const headers = new AxiosHeaders(config.headers);
 
         // Headers obrigatórios
-        headers['X-Tenant-Id'] = TENANT_CONFIG.tenantId;
-        headers['X-Correlation-Id'] = uuidv4();
+        headers.set("X-Tenant-Id", TENANT_CONFIG.tenantId);
+        headers.set("X-Correlation-Id", uuidv4());
 
         // Recupera dados de autenticação do localStorage
-        if (typeof window !== 'undefined') {
+        if (typeof window !== "undefined") {
           const authData = this.getAuthData();
 
-          if (authData?.tokens?.accessToken && !headers['Authorization']) {
-            const tokenType = authData.tokens.tokenType ?? 'Bearer';
-            headers['Authorization'] = `${tokenType} ${authData.tokens.accessToken}`;
+          if (authData?.tokens?.accessToken && !headers.has("Authorization")) {
+            const tokenType = authData.tokens.tokenType ?? "Bearer";
+            headers.set(
+              "Authorization",
+              `${tokenType} ${authData.tokens.accessToken}`
+            );
           }
 
           if (authData?.user) {
-            headers['X-User-Id'] = authData.user.id;
-            headers['X-User-Name'] = authData.user.name ?? authData.user.nome ?? '';
+            headers.set("X-User-Id", authData.user.id);
+            headers.set(
+              "X-User-Name",
+              authData.user.name ?? authData.user.nome ?? ""
+            );
           }
         }
 
         config.headers = headers;
-
         return config;
       },
-      (error) => {
-        return Promise.reject(error);
-      }
+      (error) => Promise.reject(error)
     );
 
-    // Response interceptor - trata erros globalmente
+    // Response: redireciona para /login e faz log seguro
     this.client.interceptors.response.use(
       (response) => response,
-      async (error: AxiosError) => {
-        // Token expirado - redireciona para login
-        if (error.response?.status === 401) {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('auth-storage');
-            window.location.href = '/login';
+      async (error) => {
+        const status = error?.response?.status ?? null;
+        const code = error?.code ?? null;
+
+        const goLogin = () => {
+          if (typeof window !== "undefined" && !location.pathname.startsWith("/login")) {
+            try { localStorage.removeItem("auth-storage"); } catch {}
+            location.href = "/login";
           }
+        };
+
+        // Sem conexão / CORS barrado / mixed content etc.
+        if (code === "ERR_NETWORK") {
+          goLogin();
         }
 
-        // Loga erros no console (pode ser enviado para serviço de logging)
-        console.error('[HTTP Client Error]', {
-          url: error.config?.url,
-          method: error.config?.method,
-          status: error.response?.status,
-          data: error.response?.data,
-        });
+        // Não autenticado ou proibido → login
+        if (status === 401 || status === 403) {
+          goLogin();
+        }
+
+        // ===== LOG SEGURO (não vira {} no overlay do Next) =====
+        const baseURL = error.config?.baseURL || "";
+        const urlPath = error.config?.url || "";
+        const fullUrl = baseURL + urlPath;
+        const method = error.config?.method?.toUpperCase();
+
+        const isBlob =
+          typeof Blob !== "undefined" && error?.response?.data instanceof Blob;
+        const isArrayBuffer =
+          typeof ArrayBuffer !== "undefined" &&
+          error?.response?.data instanceof ArrayBuffer;
+
+        const safeData = (() => {
+          const data = error?.response?.data;
+          if (data == null) return null;
+          if (typeof data === "string") return data;
+          if (isBlob) return `Blob(${(data as Blob).type}, ${(data as Blob).size} bytes)`;
+          if (isArrayBuffer)
+            return `ArrayBuffer(${(data as ArrayBuffer).byteLength} bytes)`;
+          try {
+            return JSON.stringify(data);
+          } catch {
+            return String(data);
+          }
+        })();
+
+        const logPayload = isAxiosError(error)
+          ? {
+              status: error.response?.status ?? null,
+              code: error.code ?? null,
+              method,
+              url: fullUrl || null,
+              data: safeData,
+            }
+          : { message: String(error) };
+
+        console.error("[HTTP Client Error] " + JSON.stringify(logPayload, null, 2));
 
         return Promise.reject(error);
       }
@@ -112,73 +168,54 @@ export class HttpClient {
   }
 
   /**
-   * Recupera dados de autenticação do localStorage
+   * Recupera dados de autenticação do localStorage (formato Zustand persist)
    */
   private getAuthData(): PersistedAuthState | null {
     try {
-      const authStorage = localStorage.getItem('auth-storage');
+      const authStorage = localStorage.getItem("auth-storage");
       if (!authStorage) return null;
 
       const parsed: PersistedAuthStorage = JSON.parse(authStorage);
-      return parsed.state ?? null; // Zustand persist formato
+      return parsed.state ?? null;
     } catch (error) {
-      console.error('Erro ao recuperar dados de autenticação:', error);
+      console.error("Erro ao recuperar dados de autenticação:", String(error));
       return null;
     }
   }
 
-  /**
-   * GET request
-   */
+  // ==== Métodos HTTP ====
+
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.get<T>(url, config);
     return response.data;
   }
 
-  /**
-   * POST request
-   */
   async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.post<T>(url, data, config);
     return response.data;
   }
 
-  /**
-   * PUT request
-   */
   async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.put<T>(url, data, config);
     return response.data;
   }
 
-  /**
-   * PATCH request
-   */
   async patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.patch<T>(url, data, config);
     return response.data;
   }
 
-  /**
-   * DELETE request
-   */
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.delete<T>(url, config);
     return response.data;
   }
 
-  /**
-   * Download de arquivo (blob)
-   */
   async downloadFile(url: string, filename: string): Promise<void> {
-    const response = await this.client.get(url, {
-      responseType: 'blob',
-    });
+    const response = await this.client.get(url, { responseType: "blob" });
 
-    // Cria link temporário para download
     const blob = new Blob([response.data]);
     const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = downloadUrl;
     link.download = filename;
     document.body.appendChild(link);
@@ -188,5 +225,5 @@ export class HttpClient {
   }
 }
 
-// Singleton instance - reutilizada em toda aplicação
+// Singleton instance
 export const httpClient = new HttpClient();

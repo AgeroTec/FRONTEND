@@ -21,17 +21,6 @@ export default function LoginPage() {
 
     try {
       await loginStore(usuario, senha);
-
-      // Persistência opcional: se marcar "Lembrar de mim", salva no localStorage
-      if (lembrar) {
-        const authState = useAuthStore.getState();
-        localStorage.setItem("auth-store", JSON.stringify({
-          user: authState.user,
-          isAuthenticated: true,
-          tokens: authState.tokens,
-        }));
-      }
-
       router.push("/home");
     } catch (err) {
       if (err instanceof Error) {

@@ -38,8 +38,8 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const auth = localStorage.getItem("auth");
-    if (!auth) {
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
       router.replace("/login");
     } else {
       setIsAuth(true);
@@ -197,7 +197,10 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
             {renderNavItem("/suporte", <LifeBuoy size={18} />, "Suporte", pathname === "/suporte")}
             <button
               onClick={() => {
-                localStorage.removeItem("auth");
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("tokenType");
+                localStorage.removeItem("tokenExpiration");
+                localStorage.removeItem("auth-storage");
                 window.location.href = "/login";
               }}
               className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-100 text-red-600"
@@ -328,7 +331,10 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                 </a>
                 <button
                   onClick={() => {
-                    localStorage.removeItem("auth");
+                    localStorage.removeItem("accessToken");
+                    localStorage.removeItem("tokenType");
+                    localStorage.removeItem("tokenExpiration");
+                    localStorage.removeItem("auth-storage");
                     router.push("/login");
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue"

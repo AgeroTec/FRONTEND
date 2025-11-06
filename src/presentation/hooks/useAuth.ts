@@ -12,10 +12,10 @@ export const useAuth = () => {
 
     const logout = () => {
         if (typeof window === 'undefined') return;
-        localStorage.removeItem("auth");
         localStorage.removeItem("accessToken");
         localStorage.removeItem("tokenType");
         localStorage.removeItem("tokenExpiration");
+        localStorage.removeItem("auth-storage");
     };
 
     return { isAuthenticated, getToken, logout };
