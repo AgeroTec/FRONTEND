@@ -2,35 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { empresaService } from "@/application/services/EmpresaService";
+import { Empresa } from "@/domain/entities/Empresa";
 
 export default function NovaEmpresaPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    codigo: "",
+  const [formData, setFormData] = useState<Empresa>({
     nomeempresa: "",
+    nomefantasia: "",
     codgrupoempresa: "",
     nucnpj: "",
     uf: "",
-    ativo: "",
+    ativo: "ativo",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      const response = await fetch("http://192.168.1.100:5103/api/v1/empresas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) throw new Error("Erro ao salvar empresa");
-
+      await empresaService.create.execute(formData);
       alert("Empresa cadastrada com sucesso!");
-      router.push("/empresa"); // volta para a lista
+      router.push("/empresa");
     } catch (error) {
-      alert("Erro ao salvar empresa: " + error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erro ao salvar empresa"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -41,13 +44,7 @@ export default function NovaEmpresaPage() {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input
           className="border rounded p-2"
-          placeholder="Código (opcional)"
-          value={formData.codigo}
-          onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-        />
-        <input
-          className="border rounded p-2"
-          placeholder="Nome da Empresa"
+          placeholder="Nome da Empresa *"
           value={formData.nomeempresa}
           onChange={(e) => setFormData({ ...formData, nomeempresa: e.target.value })}
           required
@@ -55,14 +52,27 @@ export default function NovaEmpresaPage() {
         <input
           className="border rounded p-2"
           placeholder="Nome Fantasia"
-          value={formData.codgrupoempresa}
+          value={formData.nomefantasia || ""}
+          onChange={(e) => setFormData({ ...formData, nomefantasia: e.target.value })}
+        />
+        <input
+          className="border rounded p-2"
+          placeholder="CNPJ"
+          value={formData.nucnpj || ""}
+          onChange={(e) => setFormData({ ...formData, nucnpj: e.target.value })}
+        />
+        <input
+          className="border rounded p-2"
+          placeholder="Código do Grupo"
+          value={formData.codgrupoempresa || ""}
           onChange={(e) => setFormData({ ...formData, codgrupoempresa: e.target.value })}
         />
         <input
           className="border rounded p-2"
           placeholder="UF"
-          value={formData.uf}
-          onChange={(e) => setFormData({ ...formData, uf: e.target.value })}
+          maxLength={2}
+          value={formData.uf || ""}
+          onChange={(e) => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
         />
         <select
           className="border rounded p-2"
@@ -79,14 +89,16 @@ export default function NovaEmpresaPage() {
             type="button"
             onClick={() => router.push("/empresa")}
             className="px-4 py-2 rounded border"
+            disabled={loading}
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:bg-green-300"
+            disabled={loading}
           >
-            Salvar
+            {loading ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </form>

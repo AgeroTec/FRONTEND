@@ -2,26 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-// ✅ Função utilitária de fetch seguro
-async function safeFetchJson(url: string) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Erro ao buscar dados (${response.status})`);
-
-  const text = await response.text();
-  if (!text) return {}; // evita erro "Unexpected end of JSON input"
-
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    console.error("Erro ao converter resposta em JSON:", err);
-    return {};
-  }
-}
+import { clienteService } from "@/application/services/ClienteService";
+import { Cliente } from "@/domain/entities/Cliente";
 
 export default function ClientesPage() {
   const router = useRouter();
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<Cliente[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchData, setSearchData] = useState({
     codigo: "",
     razaoSocial: "",
@@ -34,27 +21,20 @@ export default function ClientesPage() {
   });
 
   const handleSearch = async () => {
+    setLoading(true);
     try {
-      const query = new URLSearchParams({
-        codigo: searchData.codigo,
-        razaoSocial: searchData.razaoSocial,
-        nomeFantasia: searchData.nomeFantasia,
-        municipio: searchData.municipio,
-        uf: searchData.uf,
-        cnpjCpf: searchData.cnpjCpf,
-        tipo: searchData.tipo,
-        ativo: searchData.ativo,
-      }).toString();
-
-      // ✅ Usa o fetch seguro
-      const data = await safeFetchJson(`http://192.168.1.100:5103/api/v1/clientes?${query}`);
-
-      // Garante sempre um array válido
-      setResults(Array.isArray(data.items) ? data.items : []);
+      const response = await clienteService.search.execute(searchData);
+      setResults(response.items || []);
     } catch (error) {
       console.error("Erro ao buscar clientes:", error);
-      alert("Não foi possível conectar ao servidor. Verifique se a API está online.");
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível conectar ao servidor."
+      );
       setResults([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,8 +86,9 @@ export default function ClientesPage() {
             <input
               placeholder="UF"
               className="w-20 border rounded p-2"
+              maxLength={2}
               value={searchData.uf}
-              onChange={(e) => setSearchData({ ...searchData, uf: e.target.value })}
+              onChange={(e) => setSearchData({ ...searchData, uf: e.target.value.toUpperCase() })}
             />
           </div>
           <input
@@ -121,7 +102,8 @@ export default function ClientesPage() {
             value={searchData.tipo}
             onChange={(e) => setSearchData({ ...searchData, tipo: e.target.value })}
           >
-            <option value="fornecedor">Cliente</option>
+            <option value="">Todos os tipos</option>
+            <option value="cliente">Cliente</option>
             <option value="colaborador">Colaborador</option>
           </select>
 
@@ -130,16 +112,18 @@ export default function ClientesPage() {
             value={searchData.ativo}
             onChange={(e) => setSearchData({ ...searchData, ativo: e.target.value })}
           >
+            <option value="">Todos os status</option>
             <option value="true">Ativo</option>
             <option value="false">Inativo</option>
           </select>
         </div>
         <div className="mt-4">
           <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
             onClick={handleSearch}
+            disabled={loading}
           >
-            Pesquisar
+            {loading ? "Pesquisando..." : "Pesquisar"}
           </button>
         </div>
       </div>
@@ -174,12 +158,12 @@ export default function ClientesPage() {
                 <tr key={idx} className="hover:bg-gray-50">
                   <td className="border px-4 py-2">{item.codigo || "-"}</td>
                   <td className="border px-4 py-2">{item.razaoSocial}</td>
-                  <td className="border px-4 py-2">{item.nomeFantasia}</td>
+                  <td className="border px-4 py-2">{item.nomeFantasia || "-"}</td>
                   <td className="border px-4 py-2">
-                    {item.municipio} / {item.uf}
+                    {item.municipio || "-"} / {item.uf || "-"}
                   </td>
-                  <td className="border px-4 py-2">{item.cnpj}</td>
-                  <td className="border px-4 py-2">{item.tipo}</td>
+                  <td className="border px-4 py-2">{item.cnpj || item.cpf || "-"}</td>
+                  <td className="border px-4 py-2">{item.tipo || "-"}</td>
                   <td className="border px-4 py-2">{item.ativo}</td>
                   <td className="border px-4 py-2">
                     <button

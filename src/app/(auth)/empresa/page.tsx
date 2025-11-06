@@ -2,26 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-// ✅ Função utilitária de fetch seguro
-async function safeFetchJson(url: string) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Erro ao buscar dados (${response.status})`);
-
-  const text = await response.text();
-  if (!text) return {}; // evita erro "Unexpected end of JSON input"
-
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    console.error("Erro ao converter resposta em JSON:", err);
-    return {};
-  }
-}
+import { empresaService } from "@/application/services/EmpresaService";
+import { Empresa } from "@/domain/entities/Empresa";
 
 export default function EmpresaPage() {
   const router = useRouter();
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<Empresa[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchData, setSearchData] = useState({
     codigo: "",
     nomeempresa: "",
@@ -32,25 +19,20 @@ export default function EmpresaPage() {
   });
 
   const handleSearch = async () => {
+    setLoading(true);
     try {
-      const query = new URLSearchParams({
-        codigo: searchData.codigo,
-        nomeempresa: searchData.nomeempresa,
-        codgrupoempresa: searchData.codgrupoempresa,
-        nucnpj: searchData.nucnpj,
-        uf: searchData.uf,
-        ativo: searchData.ativo,
-      }).toString();
-
-      // ✅ Usa o fetch seguro
-      const data = await safeFetchJson(`http://192.168.1.100:5103/api/v1/empresas?${query}`);
-
-      // Garante sempre um array válido
-      setResults(Array.isArray(data.items) ? data.items : []);
+      const response = await empresaService.search.execute(searchData);
+      setResults(response.items || []);
     } catch (error) {
-      console.error("Erro ao buscar credores:", error);
-      alert("Não foi possível conectar ao servidor. Verifique se a API está online.");
+      console.error("Erro ao buscar empresas:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível conectar ao servidor."
+      );
       setResults([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -117,10 +99,11 @@ export default function EmpresaPage() {
         </div>
         <div className="mt-4">
           <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
             onClick={handleSearch}
+            disabled={loading}
           >
-            Pesquisar
+            {loading ? "Pesquisando..." : "Pesquisar"}
           </button>
         </div>
       </div>

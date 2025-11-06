@@ -58,3 +58,31 @@ export async function apiFetch<T = any>(
     throw new Error("Erro desconhecido ao acessar API");
   }
 }
+
+export const apiClient = {
+  get: <T = any>(endpoint: string, skipAuth = false): Promise<T> =>
+    apiFetch<T>(endpoint, { method: "GET" }, skipAuth),
+
+  post: <T = any>(endpoint: string, body: any, skipAuth = false): Promise<T> =>
+    apiFetch<T>(
+      endpoint,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      skipAuth
+    ),
+
+  put: <T = any>(endpoint: string, body: any, skipAuth = false): Promise<T> =>
+    apiFetch<T>(
+      endpoint,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      skipAuth
+    ),
+
+  delete: <T = any>(endpoint: string, skipAuth = false): Promise<T> =>
+    apiFetch<T>(endpoint, { method: "DELETE" }, skipAuth),
+};

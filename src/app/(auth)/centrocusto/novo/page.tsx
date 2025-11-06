@@ -2,34 +2,35 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ActivityIcon } from "lucide-react";
+import { centroCustoService } from "@/application/services/CentroCustoService";
+import { CentroCusto } from "@/domain/entities/CentroCusto";
 
 export default function NovoCentroDeCustoPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    codigo: "",
+  const [formData, setFormData] = useState<CentroCusto>({
     nomecentrocusto: "",
     nomeempresa: "",
-    ativo: "",
+    ativo: "true",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      const response = await fetch("http://192.168.1.100:5103/api/v1/centrodecustos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) throw new Error("Erro ao salvar centro de custo");
-
+      await centroCustoService.create.execute(formData);
       alert("Centro de Custos cadastrado com sucesso!");
-      router.push("/centrocusto"); // volta para a lista
+      router.push("/centrocusto");
     } catch (error) {
-      alert("Erro ao salvar centro de custo: " + error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erro ao salvar centro de custo"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -40,21 +41,15 @@ export default function NovoCentroDeCustoPage() {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input
           className="border rounded p-2"
-          placeholder="Código (opcional)"
-          value={formData.codigo}
-          onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-        />
-        <input
-          className="border rounded p-2"
-          placeholder="Razão Social / Nome"
+          placeholder="Nome do Centro de Custo *"
           value={formData.nomecentrocusto}
           onChange={(e) => setFormData({ ...formData, nomecentrocusto: e.target.value })}
           required
         />
         <input
           className="border rounded p-2"
-          placeholder="Nome Fantasia"
-          value={formData.nomeempresa}
+          placeholder="Nome da Empresa"
+          value={formData.nomeempresa || ""}
           onChange={(e) => setFormData({ ...formData, nomeempresa: e.target.value })}
         />
         <select
@@ -63,8 +58,8 @@ export default function NovoCentroDeCustoPage() {
           onChange={(e) => setFormData({ ...formData, ativo: e.target.value })}
           required
         >
-          <option value="fornecedor">Ativo</option>
-          <option value="colaborador">Inativo</option>
+          <option value="true">Ativo</option>
+          <option value="false">Inativo</option>
         </select>
 
         <div className="col-span-full flex justify-end gap-2 mt-4">
@@ -72,14 +67,16 @@ export default function NovoCentroDeCustoPage() {
             type="button"
             onClick={() => router.push("/centrocusto")}
             className="px-4 py-2 rounded border"
+            disabled={loading}
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:bg-green-300"
+            disabled={loading}
           >
-            Salvar
+            {loading ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </form>

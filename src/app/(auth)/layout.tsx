@@ -1,7 +1,8 @@
 "use client";
-{/* Ver DeepSeek */}
+
 import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuthStore } from "@/presentation/stores/authStore";
 import {
   Home,
   Trophy,
@@ -26,9 +27,11 @@ import {
 
 export default function Sidebar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname(); // ✅ captura a rota atual
+  const pathname = usePathname();
+  const checkAuth = useAuthStore((s) => s.checkAuth);
+  const logout = useAuthStore((s) => s.logout);
   const [isAuth, setIsAuth] = useState(false);
-  
+
   const [desktopOpen, setDesktopOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -38,8 +41,8 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const auth = localStorage.getItem("auth");
-    if (!auth) {
+    const authenticated = checkAuth();
+    if (!authenticated) {
       router.replace("/login");
     } else {
       setIsAuth(true);
@@ -53,10 +56,10 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
         setProfileOpen(false);
       }
     };
-    
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [router]);
+  }, [router, checkAuth]);
 
   const toggleRelatorio = (key: string) => {
     setRelatorioOpen((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -196,9 +199,9 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
           <div className="px-3 py-4 mt-auto flex flex-col gap-2 border-t border-gray-200">
             {renderNavItem("/suporte", <LifeBuoy size={18} />, "Suporte", pathname === "/suporte")}
             <button
-              onClick={() => {
-                localStorage.removeItem("auth");
-                window.location.href = "/login";
+              onClick={async () => {
+                await logout();
+                router.push("/login");
               }}
               className="flex items-center gap-3 px-3 py-2 rounded hover:bg-gray-100 text-red-600"
             >
@@ -327,8 +330,8 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
                   Meu Perfil
                 </a>
                 <button
-                  onClick={() => {
-                    localStorage.removeItem("auth");
+                  onClick={async () => {
+                    await logout();
                     router.push("/login");
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue"
