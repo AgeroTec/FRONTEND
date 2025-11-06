@@ -1,32 +1,44 @@
-// src/presentation/stores/authStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { apiFetch } from "@/infrastructure/http/apiClient";
 
-interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+import { authService } from "@/application/services/AuthService";
+import { AuthUser } from "@/domain/entities/AuthUser";
+import { AuthTokens } from "@/domain/valueObjects/AuthTokens";
 
-interface AuthTokens {
-  accessToken: string;
-  expiresIn: number;
-  tokenType: string;
-  refreshToken: string | null;
-  idToken: string | null;
-  scope: string;
-  issuedAt: string;
-  [key: string]: any;
-}
+const persistTokenMetadata = (tokens: AuthTokens): void => {
+  if (typeof window === "undefined") return;
+
+  localStorage.setItem("accessToken", tokens.accessToken);
+  localStorage.setItem("tokenType", tokens.tokenType);
+
+  if (tokens.expiresIn && tokens.expiresIn > 0) {
+    const issuedTime = tokens.issuedAt
+      ? new Date(tokens.issuedAt).getTime()
+      : Date.now();
+    const expirationTime = issuedTime + tokens.expiresIn * 1000;
+    localStorage.setItem("tokenExpiration", new Date(expirationTime).toISOString());
+  } else {
+    localStorage.removeItem("tokenExpiration");
+  }
+};
+
+const clearTokenMetadata = (): void => {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("tokenType");
+  localStorage.removeItem("tokenExpiration");
+  localStorage.removeItem("auth-storage");
+};
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   tokens: AuthTokens | null;
   login: (login: string, senha: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth: () => boolean;
+  isTokenExpired: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -36,56 +48,67 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       tokens: null,
 
-      login: async (login: string, senha: string) => {
+      login: async (login: string, senha: string): Promise<void> => {
         try {
-          // Faz login
-          const tokens = await apiFetch<AuthTokens>(
-            "/auth/login",
-            {
-              method: "POST",
-              body: JSON.stringify({ login, senha }),
-            },
-            true
-          );
-
-          if (!tokens?.accessToken)
-            throw new Error("A resposta não contém accessToken.");
-
-          // Busca o usuário (se existir o endpoint /auth/me)
-          let user: User | null = null;
-          try {
-            user = await apiFetch<User>("/auth/me");
-          } catch {
-            user = {
-              id: "1",
-              email: login,
-              name: login.split("@")[0],
-            };
-          }
+          const response = await authService.login.execute({ login, senha });
 
           set({
-            user,
-            tokens,
+            user: response.user,
             isAuthenticated: true,
+            tokens: response.tokens
           });
-        } catch (err) {
-          if (err instanceof Error) throw new Error(err.message);
-          throw new Error("Erro ao autenticar usuário.");
+
+          persistTokenMetadata(response.tokens);
+        } catch (error) {
+          set({ user: null, isAuthenticated: false, tokens: null });
+          clearTokenMetadata();
+
+          if (error instanceof Error) {
+            throw error;
+          }
+
+          throw new Error("Erro desconhecido ao fazer login");
         }
       },
 
-      logout: () => {
-        set({
-          user: null,
-          tokens: null,
-          isAuthenticated: false,
-        });
-        localStorage.removeItem("auth-storage");
+      logout: async (): Promise<void> => {
+        try {
+          await authService.logout.execute();
+        } catch (error) {
+          console.error("Erro ao realizar logout:", error);
+        } finally {
+          clearTokenMetadata();
+          set({ user: null, isAuthenticated: false, tokens: null });
+        }
       },
 
-      checkAuth: () => {
-        const s = get();
-        return s.isAuthenticated && !!s.tokens?.accessToken;
+      checkAuth: (): boolean => {
+        const state = get();
+
+        if (!state.isAuthenticated || !state.tokens?.accessToken) {
+          return false;
+        }
+
+        if (state.isTokenExpired()) {
+          clearTokenMetadata();
+          set({ user: null, isAuthenticated: false, tokens: null });
+          return false;
+        }
+
+        return true;
+      },
+
+      isTokenExpired: (): boolean => {
+        const state = get();
+        const tokens = state.tokens;
+
+        if (!tokens?.expiresIn || !tokens?.issuedAt) {
+          return false;
+        }
+
+        const issuedTime = new Date(tokens.issuedAt).getTime();
+        const expirationTime = issuedTime + tokens.expiresIn * 1000;
+        return Date.now() >= expirationTime;
       },
     }),
     {
