@@ -72,20 +72,10 @@ export default function CredoresPage() {
   const [showModal, setShowModal] = useState(false);
   const [modalStep, setModalStep] = useState(1);
   const [formData, setFormData] = useState<any>({
-    tipoCredor: "",
-    tipoPessoa: "",
+    ativo: "",
     cnpjCpf: "",
     razaoSocial: "",
     fantasia: "",
-    microempresa: false,
-    transportadora: false,
-    estrangeiro: false,
-    inscricaoEstadual: "",
-    regimeTributacao: "",
-    tipoServico: "",
-    naturezaRendimento: "",
-    cprb: "",
-    associacaoDesportiva: false,
   });
 
   // Buscar credores
@@ -174,7 +164,6 @@ export default function CredoresPage() {
           value={searchData.tipo}
           onChange={(e) => setSearchData({ ...searchData, tipo: e.target.value })}
         >
-          <option value="">Tipo de credor</option>
           <option value="fornecedor">Fornecedor</option>
           <option value="colaborador">Colaborador</option>
           <option value="corretor">Corretor</option>
@@ -185,7 +174,6 @@ export default function CredoresPage() {
           value={searchData.ativo}
           onChange={(e) => setSearchData({ ...searchData, ativo: e.target.value })}
         >
-          <option value="">Status</option>
           <option value="S">Ativo</option>
           <option value="N">Desativado</option>
         </select>
@@ -291,33 +279,6 @@ export default function CredoresPage() {
             {modalStep === 1 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-[#111827] mb-2">Identificação</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-[#111827]">Tipo de credor*</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md px-3 py-2"
-                      value={formData.tipoCredor}
-                      onChange={(e) => updateField("tipoCredor", e.target.value)}
-                    >
-                      <option value="">Selecione</option>
-                      <option value="fornecedor">Fornecedor</option>
-                      <option value="colaborador">Colaborador</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-[#111827]">Tipo de pessoa*</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md px-3 py-2"
-                      value={formData.tipoPessoa}
-                      onChange={(e) => updateField("tipoPessoa", e.target.value)}
-                    >
-                      <option value="">Selecione</option>
-                      <option value="fisica">Física</option>
-                      <option value="juridica">Jurídica</option>
-                    </select>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="text-sm font-medium text-[#111827]">CNPJ/CPF*</label>
@@ -354,104 +315,25 @@ export default function CredoresPage() {
 
                 {/* Checkboxes */}
                 <div className="flex gap-6 mt-2">
-                  <label className="flex items-center gap-2 text-sm text-[#111827]">
-                    <input
-                      type="checkbox"
-                      checked={formData.microempresa}
-                      onChange={(e) => updateField("microempresa", e.target.checked)}
-                    />
-                    Microempresa
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-[#111827]">
-                    <input
-                      type="checkbox"
-                      checked={formData.transportadora}
-                      onChange={(e) => updateField("transportadora", e.target.checked)}
-                    />
-                    Transportadora
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-[#111827]">
-                    <input
-                      type="checkbox"
-                      checked={formData.estrangeiro}
-                      onChange={(e) => updateField("estrangeiro", e.target.checked)}
-                    />
-                    Estrangeiro
-                  </label>
+
                 </div>
               </div>
             )}
 
             {/* Conteúdo Etapa 2 */}
             {modalStep === 2 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[#111827] mb-2">Fiscal</h3>
-                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-[#111827]">Inscrição estadual*</label>
-                    <input
-                      className="w-full border border-gray-300 rounded-md px-3 py-2"
-                      placeholder="Digite"
-                      value={formData.inscricaoEstadual}
-                      onChange={(e) => updateField("inscricaoEstadual", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-[#111827]">Regime de tributação*</label>
+                    <h3 className="text-lg font-semibold text-[#111827] mb-2">Status do Cadastro</h3>
+                    <label className="text-sm font-medium text-[#111827]">Ativo*</label>
                     <select
                       className="w-full border border-gray-300 rounded-md px-3 py-2"
-                      value={formData.regimeTributacao}
-                      onChange={(e) => updateField("regimeTributacao", e.target.value)}
+                      value={formData.ativo}
+                      onChange={(e) => updateField("Ativo", e.target.value)}
                     >
-                      <option value="">Selecione</option>
-                      <option value="simples">Simples Nacional</option>
-                      <option value="lucro_presumido">Lucro Presumido</option>
+                      <option value="Ativo">Ativo</option>
+                      <option value="Inativo">Inativo</option>
                     </select>
                   </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-[#111827]">Tipo de serviço preponderante*</label>
-                  <select
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                    value={formData.tipoServico}
-                    onChange={(e) => updateField("tipoServico", e.target.value)}
-                  >
-                    <option value="">Selecione</option>
-                    <option value="servico">Serviço</option>
-                    <option value="comercio">Comércio</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-[#111827]">Natureza do rendimento</label>
-                  <input
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Digite"
-                    value={formData.naturezaRendimento}
-                    onChange={(e) => updateField("naturezaRendimento", e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-[#111827]">CPRB (anos)*</label>
-                  <input
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Digite"
-                    value={formData.cprb}
-                    onChange={(e) => updateField("cprb", e.target.value)}
-                  />
-                </div>
-
-                <label className="flex items-center gap-2 text-sm text-[#111827] mt-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.associacaoDesportiva}
-                    onChange={(e) => updateField("associacaoDesportiva", e.target.checked)}
-                  />
-                  Associação desportiva
-                </label>
-              </div>
             )}
 
             {/* Rodapé do modal */}
@@ -468,6 +350,22 @@ export default function CredoresPage() {
                   className="bg-[#0048B0] text-white px-5 py-2 rounded-md hover:bg-[#003c90]"
                 >
                   Próximo
+                </button>
+              ) : (
+                <button
+                  onClick={handleSave}
+                  className="bg-[#0048B0] text-white px-5 py-2 rounded-md hover:bg-[#003c90]"
+                >
+                  Salvar
+                </button>
+                
+              )}
+              {modalStep === 2 ? (
+                <button
+                  onClick={() => setModalStep(1)}
+                  className="bg-[#0048B0] text-white px-5 py-2 rounded-md hover:bg-[#003c90]"
+                >
+                  Anterior
                 </button>
               ) : (
                 <button
