@@ -50,7 +50,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-sm text-blue-300">
-            Copyright 2023 Unio. Todos os direitos reservados
+            Popriedade de Agero Tecnologia Ltda.
           </div>
         </div>
       </div>

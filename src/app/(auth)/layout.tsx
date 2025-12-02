@@ -274,7 +274,7 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
           {desktopOpen && <div className="border-t border-gray-200 my-2"></div>}
           {desktopOpen && <div className="text-gray-400 text-xs px-3 uppercase">Outros Módulos</div>}
 
-          {renderCollapsibleItem("apoio", <FilePlus size={18} />, "Apoio", [
+          {renderCollapsibleItem("suporteoperacional", <FilePlus size={18} />, "Suporte Operacional", [
             { href: "/credor", text: "Credores" },
             { href: "/cliente", text: "Cliente" },
             { href: "/centrocusto", text: "Centro de Custos" },
