@@ -26,7 +26,7 @@ export function LoginForm({ onSubmit, loading, error }: LoginFormProps) {
           type="text"
           value={usuario}
           onChange={(e) => setUsuario(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Digite seu usuário"
           required
           disabled={loading}
@@ -41,7 +41,7 @@ export function LoginForm({ onSubmit, loading, error }: LoginFormProps) {
           type="password"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Digite sua senha"
           required
           disabled={loading}
