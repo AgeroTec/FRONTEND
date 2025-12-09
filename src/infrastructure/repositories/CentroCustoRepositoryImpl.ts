@@ -1,5 +1,6 @@
 import { ICentroCustoRepository } from "@/domain/repositories/ICentroCustoRepository";
-import { CentroCusto, CentroCustoSearchParams, PagedResult } from "@/domain/entities/CentroCusto";
+import { CentroCusto, CentroCustoSearchParams } from "@/domain/entities/CentroCusto";
+import { PagedResult } from "@/domain/types/Common";
 import { apiClient } from "../http/apiClient";
 
 export class CentroCustoRepositoryImpl implements ICentroCustoRepository {

@@ -1,5 +1,6 @@
 import { IClienteRepository } from "@/domain/repositories/IClienteRepository";
-import { ClienteSearchParams, PagedResult, Cliente } from "@/domain/entities/Cliente";
+import { ClienteSearchParams, Cliente } from "@/domain/entities/Cliente";
+import { PagedResult } from "@/domain/types/Common";
 
 export class SearchClientesUseCase {
   constructor(private readonly clienteRepository: IClienteRepository) {}

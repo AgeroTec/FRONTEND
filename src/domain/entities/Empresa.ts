@@ -1,3 +1,5 @@
+import { PaginationParams } from '@/domain/types/Common';
+
 export interface Empresa {
   codigo?: number;
   nomeempresa: string;
@@ -21,20 +23,11 @@ export interface Empresa {
   dataAtualizacao?: string;
 }
 
-export interface EmpresaSearchParams {
+export interface EmpresaSearchParams extends PaginationParams {
   codigo?: string;
   nomeempresa?: string;
   codgrupoempresa?: string;
   nucnpj?: string;
   uf?: string;
   ativo?: string;
-  page?: number;
-  pageSize?: number;
-}
-
-export interface PagedResult<T> {
-  items: T[];
-  page: number;
-  pageSize: number;
-  total: number;
 }

@@ -1,4 +1,5 @@
-import { CentroCusto, CentroCustoSearchParams, PagedResult } from "../entities/CentroCusto";
+import { CentroCusto, CentroCustoSearchParams } from "../entities/CentroCusto";
+import { PagedResult } from "../types/Common";
 
 export interface ICentroCustoRepository {
   search(params: CentroCustoSearchParams): Promise<PagedResult<CentroCusto>>;

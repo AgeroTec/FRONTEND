@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { empresaService } from "@/application/services/EmpresaService";
 import { Empresa } from "@/domain/entities/Empresa";
 
@@ -23,9 +24,14 @@ export default function EmpresaPage() {
     try {
       const response = await empresaService.search.execute(searchData);
       setResults(response.items || []);
+
+      if (response.items && response.items.length > 0) {
+        toast.success(`${response.items.length} empresa(s) encontrada(s)`);
+      } else {
+        toast.info("Nenhuma empresa encontrada");
+      }
     } catch (error) {
-      console.error("Erro ao buscar empresas:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Não foi possível conectar ao servidor."

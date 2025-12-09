@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ActivityIcon } from 'lucide-react';
+import { toast } from "sonner";
+import { contaCorrenteService } from "@/application/services/ContaCorrenteService";
 
 export default function NovaContaCorrentePage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     codigo: "",
@@ -27,20 +29,28 @@ export default function NovaContaCorrentePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      const response = await fetch("http://192.168.1.100:5103/api/v1/contascorrentes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      const payload = {
+        ...formData,
+        codigo: formData.codigo ? parseInt(formData.codigo) : undefined,
+        cdempresa: formData.cdempresa ? parseInt(formData.cdempresa) : undefined,
+        saldoInicial: formData.saldoInicial ? parseFloat(formData.saldoInicial) : undefined,
+        ativo: formData.ativo === "true" ? "S" : "N",
+      };
 
-      if (!response.ok) throw new Error("Erro ao salvar conta corrente");
-
-      alert("Conta corrente cadastrada com sucesso!");
+      await contaCorrenteService.createContaCorrente.execute(payload);
+      toast.success("Conta corrente cadastrada com sucesso!");
       router.push("/contacorrente");
     } catch (error) {
-      alert("Erro ao salvar conta corrente: " + error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao salvar conta corrente"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -176,14 +186,16 @@ export default function NovaContaCorrentePage() {
             type="button"
             onClick={() => router.push("/contacorrente")}
             className="px-4 py-2 rounded border"
+            disabled={loading}
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700"
+            className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:bg-green-300"
+            disabled={loading}
           >
-            Salvar
+            {loading ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </form>

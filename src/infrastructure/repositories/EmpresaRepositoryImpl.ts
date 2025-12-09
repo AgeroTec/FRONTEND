@@ -1,5 +1,6 @@
 import { IEmpresaRepository } from "@/domain/repositories/IEmpresaRepository";
-import { Empresa, EmpresaSearchParams, PagedResult } from "@/domain/entities/Empresa";
+import { Empresa, EmpresaSearchParams } from "@/domain/entities/Empresa";
+import { PagedResult } from "@/domain/types/Common";
 import { apiClient } from "../http/apiClient";
 
 export class EmpresaRepositoryImpl implements IEmpresaRepository {

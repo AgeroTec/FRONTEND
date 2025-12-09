@@ -1,5 +1,6 @@
 import { IEmpresaRepository } from "@/domain/repositories/IEmpresaRepository";
-import { EmpresaSearchParams, PagedResult, Empresa } from "@/domain/entities/Empresa";
+import { EmpresaSearchParams, Empresa } from "@/domain/entities/Empresa";
+import { PagedResult } from "@/domain/types/Common";
 
 export class SearchEmpresasUseCase {
   constructor(private readonly empresaRepository: IEmpresaRepository) {}

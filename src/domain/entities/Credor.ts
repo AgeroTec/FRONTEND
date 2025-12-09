@@ -1,23 +1,18 @@
+import { PaginationParams } from "../types/Common";
+
 export interface Credor {
-  id: number;
+  codigo?: number;
   nome: string;
-  fantasia: string | null;
-  cnpj: string | null;
-  cpf: string | null;
+  fantasia?: string;
+  cnpj?: string;
+  cpf?: string;
   ativo: string;
+  dataCadastro?: string;
+  dataAtualizacao?: string;
 }
 
-// CORRIGIDO: Baseado na resposta real da sua API
-export interface PagedResult<T> {
-  items: T[];
-  page: number;           // minúsculo (não PageNumber)
-  pageSize: number;       // minúsculo (não PageSize)  
-  total: number;          // total (não totalCount)
-  // totalPages, hasPrevious, hasNext podem ser calculados
-}
-
-// Interface para parâmetros de paginação
-export interface PaginationParams {
-  page: number;
-  pageSize: number;
+export interface CredorSearchParams extends PaginationParams {
+  searchTerm?: string;
+  doc?: string;
+  ativo?: string;
 }

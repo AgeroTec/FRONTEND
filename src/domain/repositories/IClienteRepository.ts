@@ -1,4 +1,5 @@
-import { Cliente, ClienteSearchParams, PagedResult } from "../entities/Cliente";
+import { Cliente, ClienteSearchParams } from "../entities/Cliente";
+import { PagedResult } from "../types/Common";
 
 export interface IClienteRepository {
   search(params: ClienteSearchParams): Promise<PagedResult<Cliente>>;

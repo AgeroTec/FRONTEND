@@ -2,26 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-// ✅ Função utilitária de fetch seguro
-async function safeFetchJson(url: string) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Erro ao buscar dados (${response.status})`);
-
-  const text = await response.text();
-  if (!text) return {}; // evita erro "Unexpected end of JSON input"
-
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    console.error("Erro ao converter resposta em JSON:", err);
-    return {};
-  }
-}
+import { toast } from "sonner";
+import { contaCorrenteService } from "@/application/services/ContaCorrenteService";
+import { ContaCorrente } from "@/domain/entities/ContaCorrente";
 
 export default function ContasCorrentesPage() {
   const router = useRouter();
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<ContaCorrente[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchData, setSearchData] = useState({
     codigo: "",
     nomeconta: "",
@@ -41,31 +29,25 @@ export default function ContasCorrentesPage() {
   });
 
   const handleSearch = async () => {
+    setLoading(true);
     try {
-      const query = new URLSearchParams({
-        codigo: searchData.codigo,
-        nomeconta: searchData.nomeconta,
-        cdempresa: searchData.cdempresa,
-        banco: searchData.banco,
-        codigoBanco: searchData.codigoBanco,
-        agencia: searchData.agencia,
-        conta: searchData.conta,
-        tipoConta: searchData.tipoConta,
-        titular: searchData.titular,
-        cnpjTitular: searchData.cnpjTitular,
-        tipoPessoa: searchData.tipoPessoa,
-        ativo: searchData.ativo,
-      }).toString();
+      const response = await contaCorrenteService.searchContasCorrentes.execute(searchData);
+      setResults(response.items || []);
 
-      // ✅ Usa o fetch seguro
-      const data = await safeFetchJson(`http://192.168.1.100:5103/api/v1/contascorrentes?${query}`);
-
-      // Garante sempre um array válido
-      setResults(Array.isArray(data.items) ? data.items : []);
+      if (response.items && response.items.length > 0) {
+        toast.success(`${response.items.length} conta(s) encontrada(s)`);
+      } else {
+        toast.info("Nenhuma conta corrente encontrada");
+      }
     } catch (error) {
-      console.error("Erro ao buscar contas correntes:", error);
-      alert("Não foi possível conectar ao servidor. Verifique se a API está online.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível conectar ao servidor."
+      );
       setResults([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -196,10 +178,11 @@ export default function ContasCorrentesPage() {
         </div>
         <div className="mt-4">
           <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
             onClick={handleSearch}
+            disabled={loading}
           >
-            Pesquisar
+            {loading ? "Pesquisando..." : "Pesquisar"}
           </button>
         </div>
       </div>

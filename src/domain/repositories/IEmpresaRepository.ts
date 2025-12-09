@@ -1,4 +1,5 @@
-import { Empresa, EmpresaSearchParams, PagedResult } from "../entities/Empresa";
+import { Empresa, EmpresaSearchParams } from "../entities/Empresa";
+import { PagedResult } from "../types/Common";
 
 export interface IEmpresaRepository {
   search(params: EmpresaSearchParams): Promise<PagedResult<Empresa>>;

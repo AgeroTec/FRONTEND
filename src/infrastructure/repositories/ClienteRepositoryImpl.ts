@@ -1,5 +1,6 @@
 import { IClienteRepository } from "@/domain/repositories/IClienteRepository";
-import { Cliente, ClienteSearchParams, PagedResult } from "@/domain/entities/Cliente";
+import { Cliente, ClienteSearchParams } from "@/domain/entities/Cliente";
+import { PagedResult } from "@/domain/types/Common";
 import { apiClient } from "../http/apiClient";
 
 export class ClienteRepositoryImpl implements IClienteRepository {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { centroCustoService } from "@/application/services/CentroCustoService";
 import { CentroCusto } from "@/domain/entities/CentroCusto";
 
@@ -21,10 +22,10 @@ export default function NovoCentroDeCustoPage() {
 
     try {
       await centroCustoService.create.execute(formData);
-      alert("Centro de Custos cadastrado com sucesso!");
+      toast.success("Centro de Custos cadastrado com sucesso!");
       router.push("/centrocusto");
     } catch (error) {
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Erro ao salvar centro de custo"

@@ -1,5 +1,6 @@
 import { centroCustoRepository } from "@/infrastructure/repositories/CentroCustoRepositoryImpl";
-import { CentroCustoSearchParams, PagedResult, CentroCusto } from "@/domain/entities/CentroCusto";
+import { CentroCustoSearchParams, CentroCusto } from "@/domain/entities/CentroCusto";
+import { PagedResult } from "@/domain/types/Common";
 
 class SearchCentroCustosUseCase {
   async execute(params: CentroCustoSearchParams): Promise<PagedResult<CentroCusto>> {

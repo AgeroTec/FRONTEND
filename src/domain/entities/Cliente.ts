@@ -1,3 +1,5 @@
+import { PaginationParams } from '@/domain/types/Common';
+
 export interface Cliente {
   codigo?: number;
   razaoSocial: string;
@@ -23,7 +25,7 @@ export interface Cliente {
   dataAtualizacao?: string;
 }
 
-export interface ClienteSearchParams {
+export interface ClienteSearchParams extends PaginationParams {
   codigo?: string;
   razaoSocial?: string;
   nomeFantasia?: string;
@@ -32,13 +34,4 @@ export interface ClienteSearchParams {
   cnpjCpf?: string;
   tipo?: string;
   ativo?: string;
-  page?: number;
-  pageSize?: number;
-}
-
-export interface PagedResult<T> {
-  items: T[];
-  page: number;
-  pageSize: number;
-  total: number;
 }

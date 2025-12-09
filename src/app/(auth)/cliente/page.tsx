@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { clienteService } from "@/application/services/ClienteService";
 import { Cliente } from "@/domain/entities/Cliente";
 
@@ -25,9 +26,14 @@ export default function ClientesPage() {
     try {
       const response = await clienteService.search.execute(searchData);
       setResults(response.items || []);
+
+      if (response.items && response.items.length > 0) {
+        toast.success(`${response.items.length} cliente(s) encontrado(s)`);
+      } else {
+        toast.info("Nenhum cliente encontrado");
+      }
     } catch (error) {
-      console.error("Erro ao buscar clientes:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Não foi possível conectar ao servidor."

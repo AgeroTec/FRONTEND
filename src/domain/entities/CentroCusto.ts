@@ -1,3 +1,5 @@
+import { PaginationParams } from '@/domain/types/Common';
+
 export interface CentroCusto {
   codigo?: number;
   nomecentrocusto: string;
@@ -8,18 +10,9 @@ export interface CentroCusto {
   dataAtualizacao?: string;
 }
 
-export interface CentroCustoSearchParams {
+export interface CentroCustoSearchParams extends PaginationParams {
   codigo?: string;
   nomecentrocusto?: string;
   nomeempresa?: string;
   ativo?: string;
-  page?: number;
-  pageSize?: number;
-}
-
-export interface PagedResult<T> {
-  items: T[];
-  page: number;
-  pageSize: number;
-  total: number;
 }

@@ -1,24 +1,30 @@
-// src/infrastructure/http/apiClient.ts
 import { useAuthStore } from "@/presentation/stores/authStore";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5103/api/v1";
 
-const defaultHeaders = {
-  accept: "application/json",
-  "Content-Type": "application/json",
-  "X-Tenant-Id": "f0e25b5a-598d-4bb9-942f-5f6710cb200a",
-  "X-Correlation-Id": "f1e2d3c4-b5a6-7890-1234-567890abcdef",
-  "Idempotency-Key": "9a8b7c6d-5e4f-3210-9876-543210fedcba",
-  "Accept-Language": "pt-BR",
-};
+const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "f0e25b5a-598d-4bb9-942f-5f6710cb200a";
 
-function buildUrl(endpoint: string) {
+function generateCorrelationId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function getDefaultHeaders(): Record<string, string> {
+  return {
+    accept: "application/json",
+    "Content-Type": "application/json",
+    "X-Tenant-Id": TENANT_ID,
+    "X-Correlation-Id": generateCorrelationId(),
+    "Accept-Language": "pt-BR",
+  };
+}
+
+function buildUrl(endpoint: string): string {
   if (!endpoint.startsWith("/")) endpoint = "/" + endpoint;
   return `${API_BASE_URL}${endpoint}`;
 }
 
-export async function apiFetch<T = any>(
+export async function apiFetch<T = unknown>(
   endpoint: string,
   options: RequestInit = {},
   skipAuth = false
@@ -26,7 +32,7 @@ export async function apiFetch<T = any>(
   const { tokens } = useAuthStore.getState();
 
   const headers: Record<string, string> = {
-    ...defaultHeaders,
+    ...getDefaultHeaders(),
     ...(options.headers as Record<string, string>),
   };
 
@@ -60,10 +66,10 @@ export async function apiFetch<T = any>(
 }
 
 export const apiClient = {
-  get: <T = any>(endpoint: string, skipAuth = false): Promise<T> =>
+  get: <T = unknown>(endpoint: string, skipAuth = false): Promise<T> =>
     apiFetch<T>(endpoint, { method: "GET" }, skipAuth),
 
-  post: <T = any>(endpoint: string, body: any, skipAuth = false): Promise<T> =>
+  post: <T = unknown>(endpoint: string, body: unknown, skipAuth = false): Promise<T> =>
     apiFetch<T>(
       endpoint,
       {
@@ -73,7 +79,7 @@ export const apiClient = {
       skipAuth
     ),
 
-  put: <T = any>(endpoint: string, body: any, skipAuth = false): Promise<T> =>
+  put: <T = unknown>(endpoint: string, body: unknown, skipAuth = false): Promise<T> =>
     apiFetch<T>(
       endpoint,
       {
@@ -83,6 +89,6 @@ export const apiClient = {
       skipAuth
     ),
 
-  delete: <T = any>(endpoint: string, skipAuth = false): Promise<T> =>
+  delete: <T = void>(endpoint: string, skipAuth = false): Promise<T> =>
     apiFetch<T>(endpoint, { method: "DELETE" }, skipAuth),
 };

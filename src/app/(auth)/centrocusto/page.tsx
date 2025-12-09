@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { centroCustoService } from "@/application/services/CentroCustoService";
 import { CentroCusto } from "@/domain/entities/CentroCusto";
 
@@ -21,9 +22,14 @@ export default function CentroCustoPage() {
     try {
       const response = await centroCustoService.search.execute(searchData);
       setResults(response.items || []);
+
+      if (response.items && response.items.length > 0) {
+        toast.success(`${response.items.length} centro(s) de custo encontrado(s)`);
+      } else {
+        toast.info("Nenhum centro de custo encontrado");
+      }
     } catch (error) {
-      console.error("Erro ao buscar centro de custo:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Não foi possível conectar ao servidor."

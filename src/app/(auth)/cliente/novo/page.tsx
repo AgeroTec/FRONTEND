@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { clienteService } from "@/application/services/ClienteService";
 import { Cliente } from "@/domain/entities/Cliente";
 
@@ -26,10 +27,10 @@ export default function NovoClientePage() {
 
     try {
       await clienteService.create.execute(formData);
-      alert("Cliente cadastrado com sucesso!");
+      toast.success("Cliente cadastrado com sucesso!");
       router.push("/cliente");
     } catch (error) {
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Erro ao salvar cliente"

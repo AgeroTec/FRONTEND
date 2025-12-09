@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { empresaService } from "@/application/services/EmpresaService";
 import { Empresa } from "@/domain/entities/Empresa";
 
@@ -24,10 +25,10 @@ export default function NovaEmpresaPage() {
 
     try {
       await empresaService.create.execute(formData);
-      alert("Empresa cadastrada com sucesso!");
+      toast.success("Empresa cadastrada com sucesso!");
       router.push("/empresa");
     } catch (error) {
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Erro ao salvar empresa"
