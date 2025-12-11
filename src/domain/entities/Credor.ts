@@ -7,6 +7,11 @@ export interface Credor {
   cnpj?: string;
   cpf?: string;
   ativo: string;
+  tipoPessoa?: 'fisica' | 'juridica';
+  tipoCredor?: 'corretor' | 'fornecedor' | 'prestador' | 'cliente' | 'parceiro';
+  microempresa?: boolean;
+  transportadora?: boolean;
+  estrangeiro?: boolean;
   dataCadastro?: string;
   dataAtualizacao?: string;
 }

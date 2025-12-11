@@ -91,4 +91,14 @@ export const apiClient = {
 
   delete: <T = void>(endpoint: string, skipAuth = false): Promise<T> =>
     apiFetch<T>(endpoint, { method: "DELETE" }, skipAuth),
+
+  patch: <T = unknown>(endpoint: string, body: unknown, skipAuth = false): Promise<T> =>
+    apiFetch<T>(
+      endpoint,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      },
+      skipAuth
+    ),
 };

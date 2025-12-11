@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
 import { Credor } from "@/domain/entities/Credor";
 import { formatCNPJ, formatCPF } from "@/presentation/utils/documentUtils";
 
-type SortField = 'nome' | 'cnpj' | 'cpf' | 'ativo' | null;
+type SortField = 'codigo' | 'nome' | 'cnpj' | 'cpf' | 'ativo' | null;
 type SortOrder = 'asc' | 'desc';
 
 interface CredorTableProps {
@@ -13,11 +12,18 @@ interface CredorTableProps {
   totalPages: number;
   sortField: SortField;
   sortOrder: SortOrder;
+  selectedIds: Set<number>;
+  allSelected: boolean;
+  someSelected: boolean;
   onEdit: (credor: Credor) => void;
   onPageChange: (page: number) => void;
   onSort: (field: SortField) => void;
   onPageSizeChange: (size: number) => void;
   onGoToPage: (page: number) => void;
+  onDelete: (credor: Credor) => void;
+  onToggleStatus: (credor: Credor) => void;
+  onToggleSelectAll: () => void;
+  onToggleSelectOne: (id: number) => void;
 }
 
 export function CredorTable({
@@ -27,11 +33,18 @@ export function CredorTable({
   totalPages,
   sortField,
   sortOrder,
+  selectedIds,
+  allSelected,
+  someSelected,
   onEdit,
   onPageChange,
   onSort,
   onPageSizeChange,
   onGoToPage,
+  onDelete,
+  onToggleStatus,
+  onToggleSelectAll,
+  onToggleSelectOne,
 }: CredorTableProps) {
   const [selectedCredorKey, setSelectedCredorKey] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -81,35 +94,65 @@ export function CredorTable({
     };
   }, [selectedCredorKey]);
 
-  const handleToggleStatus = async (credor: Credor) => {
-    const newStatus = credor.ativo === "S" ? "N" : "S";
-    const action = newStatus === "S" ? "ativar" : "inativar";
-
-    try {
-      toast.success(`Funcionalidade para ${action} será implementada em breve`);
-      setSelectedCredorKey(null);
-    } catch {
-      toast.error(`Erro ao ${action} credor`);
-    }
+  const handleToggleStatus = (credor: Credor) => {
+    onToggleStatus(credor);
+    setSelectedCredorKey(null);
   };
 
-  const handleDelete = async (credor: Credor) => {
+  const handleDelete = (credor: Credor) => {
     if (!confirm("Tem certeza que deseja excluir este credor?")) return;
 
-    try {
-      toast.success("Funcionalidade de exclusão será implementada em breve");
-      setSelectedCredorKey(null);
-    } catch {
-      toast.error("Erro ao excluir credor");
-    }
+    onDelete(credor);
+    setSelectedCredorKey(null);
   };
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #0048B0;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #003c90;
+        }
+      `}</style>
+      <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left">
-        <thead className="bg-[#F9FAFB] text-[#111827] text-sm font-semibold border-b">
+        <thead className="bg-[#F9FAFB] text-[#111827] text-sm font-semibold border-b-2 border-gray-300">
           <tr>
+            <th className="px-4 py-3 w-12">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(input) => {
+                  if (input) {
+                    input.indeterminate = someSelected;
+                  }
+                }}
+                onChange={onToggleSelectAll}
+                className="w-4 h-4 rounded border-gray-300 text-[#0048B0] focus:ring-2 focus:ring-[#0048B0] cursor-pointer"
+                aria-label="Selecionar todos os credores"
+                aria-checked={someSelected ? "mixed" : allSelected ? "true" : "false"}
+              />
+            </th>
+            <th className="px-6 py-3">
+              <button
+                onClick={() => onSort('codigo')}
+                className="group flex items-center gap-2 hover:text-[#0048B0] transition-colors"
+                aria-label="Ordenar por código"
+              >
+                Código
+                <SortIcon field="codigo" />
+              </button>
+            </th>
             <th className="px-6 py-3">
               <button
                 onClick={() => onSort('nome')}
@@ -158,7 +201,7 @@ export function CredorTable({
         <tbody className="text-[#111827] text-sm">
           {loading ? (
             <tr>
-              <td colSpan={6} className="text-center py-8 text-gray-500">
+              <td colSpan={8} className="text-center py-8 text-gray-500">
                 <div className="flex items-center justify-center" role="status" aria-live="polite">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0048B0]" aria-hidden="true"></div>
                   <span className="ml-3">Carregando credores...</span>
@@ -167,7 +210,7 @@ export function CredorTable({
             </tr>
           ) : results.length === 0 ? (
             <tr>
-              <td colSpan={6} className="text-center py-12">
+              <td colSpan={8} className="text-center py-12">
                 <div className="text-gray-400" role="status" aria-live="polite">
                   <p className="text-lg font-medium mb-1">Nenhum credor encontrado</p>
                   <p className="text-sm">Ajuste os filtros ou cadastre um novo credor</p>
@@ -176,7 +219,22 @@ export function CredorTable({
             </tr>
           ) : (
             results.map((c, index) => (
-              <tr key={c.codigo ?? `temp-${index}`} className="hover:bg-gray-50 border-b last:border-none transition-colors">
+              <tr
+                key={c.codigo ?? `temp-${index}`}
+                className="bg-gray-50 border-b border-gray-200 last:border-none hover:bg-gray-100 transition-colors"
+              >
+                <td className="px-4 py-3">
+                  {c.codigo && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.codigo)}
+                      onChange={() => onToggleSelectOne(c.codigo!)}
+                      className="w-4 h-4 rounded border-gray-300 text-[#0048B0] focus:ring-2 focus:ring-[#0048B0] cursor-pointer"
+                      aria-label={`Selecionar ${c.nome}`}
+                    />
+                  )}
+                </td>
+                <td className="px-6 py-3 text-gray-600">{c.codigo ?? "-"}</td>
                 <td className="px-6 py-3 font-medium">{c.nome}</td>
                 <td className="px-6 py-3 text-gray-600">{c.fantasia || "-"}</td>
                 <td className="px-6 py-3">{c.cnpj ? formatCNPJ(c.cnpj) : "-"}</td>
@@ -215,7 +273,7 @@ export function CredorTable({
                     className="text-gray-600 hover:text-[#0048B0] hover:bg-gray-100 rounded p-2 transition-colors"
                     aria-label={`Ações para ${c.nome}`}
                     aria-haspopup="menu"
-                    aria-expanded={selectedCredorKey === getCredorKey(c)}
+                    aria-expanded={selectedCredorKey === getCredorKey(c) ? "true" : "false"}
                   >
                     •••
                   </button>
@@ -232,15 +290,15 @@ export function CredorTable({
           {/* Linha superior: Informações e controles */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             {/* Informações */}
-            <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center gap-4 text-sm text-gray-900">
               <span role="status" aria-live="polite">
-                Mostrando <span className="font-semibold text-gray-900">{startItem}-{endItem}</span> de{' '}
-                <span className="font-semibold text-gray-900">{pagination.total}</span> credores
+                Mostrando <span className="font-semibold text-[#0048B0]">{startItem}-{endItem}</span> de{' '}
+                <span className="font-semibold text-[#0048B0]">{pagination.total}</span> credores
               </span>
               <span className="text-gray-400">|</span>
               <span>
-                Página <span className="font-semibold text-gray-900">{pagination.page}</span> de{' '}
-                <span className="font-semibold text-gray-900">{totalPages}</span>
+                Página <span className="font-semibold text-[#0048B0]">{pagination.page}</span> de{' '}
+                <span className="font-semibold text-[#0048B0]">{totalPages}</span>
               </span>
             </div>
 
@@ -272,7 +330,7 @@ export function CredorTable({
                 <button
                   onClick={() => onPageChange(1)}
                   disabled={pagination.page === 1}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 py-2 bg-[#0048B0] text-white rounded-lg text-sm hover:bg-[#003c90] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   aria-label="Primeira página"
                   title="Primeira página"
                 >
@@ -281,7 +339,7 @@ export function CredorTable({
                 <button
                   onClick={() => onPageChange(pagination.page - 1)}
                   disabled={pagination.page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 bg-[#0048B0] text-white rounded-lg text-sm hover:bg-[#003c90] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   aria-label="Página anterior"
                 >
                   Anterior
@@ -307,10 +365,10 @@ export function CredorTable({
                       <button
                         key={pageNum}
                         onClick={() => onPageChange(pageNum)}
-                        className={`px-4 py-2 border rounded-lg text-sm transition-colors ${
+                        className={`px-4 py-2 rounded-lg text-sm transition-colors ${
                           pagination.page === pageNum
-                            ? "bg-[#0048B0] text-white border-[#0048B0]"
-                            : "border-gray-300 hover:bg-white"
+                            ? "bg-[#0048B0] text-white"
+                            : "bg-[#0048B0]/10 text-[#0048B0] hover:bg-[#0048B0]/20"
                         }`}
                         aria-label={`Página ${pageNum}`}
                         aria-current={pagination.page === pageNum ? "page" : undefined}
@@ -368,7 +426,7 @@ export function CredorTable({
                 <button
                   onClick={() => onPageChange(pagination.page + 1)}
                   disabled={pagination.page === totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 bg-[#0048B0] text-white rounded-lg text-sm hover:bg-[#003c90] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   aria-label="Próxima página"
                 >
                   Próxima
@@ -376,7 +434,7 @@ export function CredorTable({
                 <button
                   onClick={() => onPageChange(totalPages)}
                   disabled={pagination.page === totalPages}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 py-2 bg-[#0048B0] text-white rounded-lg text-sm hover:bg-[#003c90] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   aria-label="Última página"
                   title="Última página"
                 >
@@ -409,9 +467,29 @@ export function CredorTable({
               setSelectedCredorKey(null);
             }}
             className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 rounded-t-lg transition-colors border-b border-gray-100"
-            aria-label="Editar credor"
+            aria-label="Visualizar credor"
           >
-            <span aria-hidden="true">✏️</span> Editar
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+              />
+            </svg>
+            Visualizar
           </button>
           <button
             type="button"
@@ -421,24 +499,45 @@ export function CredorTable({
               handleToggleStatus(selectedCredor);
               setSelectedCredorKey(null);
             }}
-            className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 transition-colors border-b border-gray-100"
-            aria-label={selectedCredor.ativo === "S" ? "Inativar credor" : "Ativar credor"}
+            className={`w-full text-left px-4 py-3 text-sm flex items-center gap-2 rounded-b-lg transition-colors ${
+              selectedCredor.ativo === "S"
+                ? "text-yellow-600 hover:bg-yellow-50"
+                : "text-green-600 hover:bg-green-50"
+            }`}
+            aria-label={selectedCredor.ativo === "S" ? "Desativar credor" : "Ativar credor"}
           >
-            <span aria-hidden="true">{selectedCredor.ativo === "S" ? "🔴" : "🟢"}</span>
-            {selectedCredor.ativo === "S" ? "Inativar" : "Ativar"}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(selectedCredor);
-              setSelectedCredorKey(null);
-            }}
-            className="w-full text-left px-4 py-3 hover:bg-red-50 text-sm text-red-600 flex items-center gap-2 rounded-b-lg transition-colors"
-            aria-label="Excluir credor"
-          >
-            <span aria-hidden="true">🗑️</span> Excluir
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              {selectedCredor.ativo === "S" ? (
+                <>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 3l18 18"
+                  />
+                </>
+              ) : (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              )}
+            </svg>
+            {selectedCredor.ativo === "S" ? "Desativar" : "Ativar"}
           </button>
         </div>
       )}

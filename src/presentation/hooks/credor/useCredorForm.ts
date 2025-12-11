@@ -29,11 +29,18 @@ interface UseCredorFormReturn {
   fieldErrors: FieldErrors;
   saving: boolean;
   checkingDuplicate: boolean;
+  showSuccessModal: boolean;
+  showErrorModal: boolean;
+  successMessage: string;
+  errorMessage: string;
   openModal: () => void;
   closeModal: () => void;
   openEditModal: (credor: Credor) => void;
   updateField: (field: string, value: string) => void;
   handleSave: (onSuccess: () => void) => Promise<void>;
+  closeSuccessModal: () => void;
+  closeErrorModal: () => void;
+  retryLastAction: () => Promise<void>;
 }
 
 export function useCredorForm(): UseCredorFormReturn {
@@ -41,6 +48,10 @@ export function useCredorForm(): UseCredorFormReturn {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [formData, setFormData] = useState<FormData>({
     cnpj: "",
     cpf: "",
@@ -56,6 +67,7 @@ export function useCredorForm(): UseCredorFormReturn {
 
   const duplicateCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const requestCounterRef = useRef(0);
+  const lastActionRef = useRef<(() => Promise<void>) | null>(null);
 
   const checkDuplicate = async (document: string, type: 'cnpj' | 'cpf') => {
     if (duplicateCheckTimeoutRef.current) {
@@ -262,6 +274,10 @@ export function useCredorForm(): UseCredorFormReturn {
   const handleSave = async (onSuccess: () => void) => {
     if (!validateForm()) return;
 
+    lastActionRef.current = async () => {
+      await handleSave(onSuccess);
+    };
+
     setSaving(true);
     try {
       const payload = {
@@ -273,20 +289,38 @@ export function useCredorForm(): UseCredorFormReturn {
 
       if (editingId) {
         await credorService.update.execute(editingId, { ...payload, ativo: 'S' });
-        toast.success("Credor atualizado com sucesso!");
+        setSuccessMessage("Credor atualizado com sucesso!");
       } else {
         await credorService.create.execute({ ...payload, ativo: 'S' });
-        toast.success("Credor cadastrado com sucesso!");
+        setSuccessMessage("Credor cadastrado com sucesso!");
       }
 
       closeModal();
       setFormData({ cnpj: "", cpf: "", nome: "", fantasia: "" });
+      setShowSuccessModal(true);
       onSuccess();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro ao salvar credor.";
-      toast.error(message);
+      setErrorMessage(message);
+      setShowErrorModal(true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const closeSuccessModal = () => {
+    setShowSuccessModal(false);
+    setSuccessMessage("");
+  };
+
+  const closeErrorModal = () => {
+    setShowErrorModal(false);
+    setErrorMessage("");
+  };
+
+  const retryLastAction = async () => {
+    if (lastActionRef.current) {
+      await lastActionRef.current();
     }
   };
 
@@ -305,10 +339,17 @@ export function useCredorForm(): UseCredorFormReturn {
     fieldErrors,
     saving,
     checkingDuplicate,
+    showSuccessModal,
+    showErrorModal,
+    successMessage,
+    errorMessage,
     openModal,
     closeModal,
     openEditModal,
     updateField,
     handleSave,
+    closeSuccessModal,
+    closeErrorModal,
+    retryLastAction,
   };
 }

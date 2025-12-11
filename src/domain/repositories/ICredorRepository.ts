@@ -7,4 +7,5 @@ export interface ICredorRepository {
   create(credor: Credor): Promise<Credor>;
   update(id: number, credor: Credor): Promise<Credor>;
   delete(id: number): Promise<void>;
+  patch(id: number, data: Partial<Credor>): Promise<Credor>;
 }

@@ -155,7 +155,7 @@ export function CredorModal({
                   value={formData.cnpj}
                   onChange={(e) => onFieldChange("cnpj", e.target.value)}
                   maxLength={18}
-                  aria-invalid={!fieldErrors.cnpj.isValid}
+                  aria-invalid={!fieldErrors.cnpj.isValid ? "true" : undefined}
                   aria-describedby={!fieldErrors.cnpj.isValid ? "cnpj-error" : undefined}
                 />
                 {formData.cnpj && fieldErrors.cnpj.isValid && !checkingDuplicate && (
@@ -186,7 +186,7 @@ export function CredorModal({
                   value={formData.cpf}
                   onChange={(e) => onFieldChange("cpf", e.target.value)}
                   maxLength={14}
-                  aria-invalid={!fieldErrors.cpf.isValid}
+                  aria-invalid={!fieldErrors.cpf.isValid ? "true" : undefined}
                   aria-describedby={!fieldErrors.cpf.isValid ? "cpf-error" : undefined}
                 />
                 {formData.cpf && fieldErrors.cpf.isValid && !checkingDuplicate && (
@@ -210,7 +210,7 @@ export function CredorModal({
                 value={formData.nome}
                 onChange={(e) => onFieldChange("nome", e.target.value)}
                 required
-                aria-invalid={!fieldErrors.nome.isValid}
+                aria-invalid={!fieldErrors.nome.isValid ? "true" : undefined}
                 aria-describedby={!fieldErrors.nome.isValid ? "nome-error" : undefined}
               />
               {formData.nome && fieldErrors.nome.isValid && (

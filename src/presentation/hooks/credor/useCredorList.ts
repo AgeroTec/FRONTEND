@@ -3,33 +3,42 @@ import { toast } from "sonner";
 import { Credor } from "@/domain/entities/Credor";
 import { credorService } from "@/application/services/CredorService";
 
-type SortField = 'nome' | 'cnpj' | 'cpf' | 'ativo' | null;
+type SortField = 'codigo' | 'nome' | 'cnpj' | 'cpf' | 'ativo' | null;
 type SortOrder = 'asc' | 'desc';
 
 interface UseCredorListReturn {
   results: Credor[];
   loading: boolean;
-  searchData: { search: string; ativo: string };
+  searchData: { search: string; ativo: string; consistencia?: string };
   pagination: { page: number; pageSize: number; total: number };
   sortField: SortField;
   sortOrder: SortOrder;
-  setSearchData: (data: { search: string; ativo: string }) => void;
+  selectedIds: Set<number>;
+  allSelected: boolean;
+  someSelected: boolean;
+  setSearchData: (data: { search: string; ativo: string; consistencia?: string }) => void;
   handleSearch: (page?: number) => Promise<void>;
   clearFilters: () => void;
   handleSort: (field: SortField) => void;
   totalPages: number;
   setPageSize: (size: number) => void;
   goToPage: (page: number) => void;
+  handleDelete: (credor: Credor) => Promise<void>;
+  handleToggleStatus: (credor: Credor) => Promise<void>;
+  toggleSelectAll: () => void;
+  toggleSelectOne: (id: number) => void;
+  clearSelection: () => void;
 }
 
 export function useCredorList(): UseCredorListReturn {
   const [results, setResults] = useState<Credor[]>([]);
   const [rawResults, setRawResults] = useState<Credor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchData, setSearchData] = useState({ search: "", ativo: "S" });
+  const [searchData, setSearchData] = useState({ search: "", ativo: "S", consistencia: "" });
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 });
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const paginationRef = useRef(pagination);
 
@@ -59,7 +68,7 @@ export function useCredorList(): UseCredorListReturn {
     } finally {
       setLoading(false);
     }
-  }, [searchData.search, searchData.ativo]);
+  }, [searchData.search, searchData.ativo, searchData.consistencia]);
 
   const sortedResults = useMemo(() => {
     if (!sortField) return rawResults;
@@ -69,6 +78,10 @@ export function useCredorList(): UseCredorListReturn {
       let bValue: string | number = '';
 
       switch (sortField) {
+        case 'codigo':
+          aValue = a.codigo || 0;
+          bValue = b.codigo || 0;
+          break;
         case 'nome':
           aValue = a.nome.toLowerCase();
           bValue = b.nome.toLowerCase();
@@ -109,7 +122,7 @@ export function useCredorList(): UseCredorListReturn {
   };
 
   const clearFilters = () => {
-    setSearchData({ search: "", ativo: "S" });
+    setSearchData({ search: "", ativo: "S", consistencia: "" });
     setSortField(null);
     setSortOrder('asc');
   };
@@ -128,7 +141,7 @@ export function useCredorList(): UseCredorListReturn {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchData.search, searchData.ativo, handleSearch]);
+  }, [searchData.search, searchData.ativo, searchData.consistencia]);
 
   const totalPages = Math.ceil(pagination.total / pagination.pageSize);
 
@@ -143,6 +156,79 @@ export function useCredorList(): UseCredorListReturn {
     }
   }, [handleSearch, totalPages]);
 
+  const handleDelete = useCallback(async (credor: Credor) => {
+    if (!credor.codigo) {
+      toast.error("Credor sem código identificador");
+      return;
+    }
+
+    try {
+      await credorService.delete.execute(credor.codigo);
+      toast.success("Credor excluído com sucesso!");
+      handleSearch(pagination.page);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erro ao excluir credor";
+      toast.error(message);
+    }
+  }, [handleSearch, pagination.page]);
+
+  const handleToggleStatus = useCallback(async (credor: Credor) => {
+    if (!credor.codigo) {
+      toast.error("Credor sem código identificador");
+      return;
+    }
+
+    const newStatus = credor.ativo === "S" ? "N" : "S";
+    const action = newStatus === "S" ? "ativado" : "inativado";
+
+    try {
+      await credorService.toggleStatus.execute(credor.codigo, newStatus);
+      toast.success(`Credor ${action} com sucesso!`);
+      handleSearch(pagination.page);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `Erro ao ${action === "ativado" ? "ativar" : "inativar"} credor`;
+      toast.error(message);
+    }
+  }, [handleSearch, pagination.page]);
+
+  // Seleção em massa
+  const allSelected = useMemo(() => {
+    const credoresComCodigo = results.filter(c => c.codigo);
+    return credoresComCodigo.length > 0 && credoresComCodigo.every(c => selectedIds.has(c.codigo!));
+  }, [results, selectedIds]);
+
+  const someSelected = useMemo(() => {
+    return selectedIds.size > 0 && !allSelected;
+  }, [selectedIds, allSelected]);
+
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      const newSelectedIds = new Set<number>();
+      results.forEach(c => {
+        if (c.codigo) newSelectedIds.add(c.codigo);
+      });
+      setSelectedIds(newSelectedIds);
+    }
+  }, [allSelected, results]);
+
+  const toggleSelectOne = useCallback((id: number) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
   return {
     results,
     loading,
@@ -150,6 +236,9 @@ export function useCredorList(): UseCredorListReturn {
     pagination,
     sortField,
     sortOrder,
+    selectedIds,
+    allSelected,
+    someSelected,
     setSearchData,
     handleSearch,
     clearFilters,
@@ -157,5 +246,10 @@ export function useCredorList(): UseCredorListReturn {
     totalPages,
     setPageSize,
     goToPage,
+    handleDelete,
+    handleToggleStatus,
+    toggleSelectAll,
+    toggleSelectOne,
+    clearSelection,
   };
 }
