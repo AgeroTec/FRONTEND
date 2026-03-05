@@ -22,6 +22,7 @@ export interface ContaCorrente {
 }
 
 export interface ContaCorrenteSearchParams extends PaginationParams {
+  searchTerm?: string;
   codigo?: string;
   nomeconta?: string;
   cdempresa?: string;

@@ -1,165 +1,165 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { empresaService } from "@/application/services/EmpresaService";
+import { empresaService } from "@/infrastructure/di/services";
 import { Empresa } from "@/domain/entities/Empresa";
+import { EntityDataTable, EntityTableColumn } from "@/presentation/components/Common/EntityDataTable";
+import { useEntitySearchPage } from "@/presentation/hooks/common/useEntitySearchPage";
+import { CredorFilters } from "@/presentation/components/Credor/CredorFilters";
+import { EntityCreateModal } from "@/presentation/components/Common/EntityCreateModal";
+import { toast } from "sonner";
+import { createEmpresaSchema, getFirstValidationError } from "@/domain/schemas/cadastroSchemas";
+
+type EmpresaSearchState = {
+  search: string;
+  ativo: string;
+  consistencia?: string;
+};
+
+const DEFAULT_FILTERS: EmpresaSearchState = {
+  search: "",
+  ativo: "",
+  consistencia: "",
+};
 
 export default function EmpresaPage() {
   const router = useRouter();
-  const [results, setResults] = useState<Empresa[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchData, setSearchData] = useState({
-    codigo: "",
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newEmpresa, setNewEmpresa] = useState<Empresa>({
     nomeempresa: "",
+    nomefantasia: "",
     codgrupoempresa: "",
     nucnpj: "",
     uf: "",
-    ativo: "",
+    ativo: "S",
   });
 
-  const handleSearch = async () => {
-    setLoading(true);
-    try {
-      const response = await empresaService.search.execute(searchData);
-      setResults(response.items || []);
+  const searchEmpresas = useCallback(async (params: EmpresaSearchState & { page: number; pageSize: number }) => {
+    const response = await empresaService.search.execute({
+      nomeempresa: params.search || undefined,
+      ativo: params.ativo || undefined,
+      page: params.page,
+      pageSize: params.pageSize,
+    });
+    return { items: response.items || [], total: response.total || 0 };
+  }, []);
 
-      if (response.items && response.items.length > 0) {
-        toast.success(`${response.items.length} empresa(s) encontrada(s)`);
-      } else {
-        toast.info("Nenhuma empresa encontrada");
-      }
+  const handleCreate = async () => {
+    const validation = createEmpresaSchema.safeParse(newEmpresa);
+    if (!validation.success) {
+      toast.error(getFirstValidationError(validation.error, "Dados invalidos para cadastro de empresa"));
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await empresaService.create.execute(newEmpresa);
+      toast.success("Empresa cadastrada com sucesso!");
+      setShowCreateModal(false);
+      setNewEmpresa({
+        nomeempresa: "",
+        nomefantasia: "",
+        codgrupoempresa: "",
+        nucnpj: "",
+        uf: "",
+        ativo: "S",
+      });
+      await handleSearch(filters, 1, pagination.pageSize);
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível conectar ao servidor."
-      );
-      setResults([]);
+      toast.error(error instanceof Error ? error.message : "Erro ao salvar empresa");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  const {
+    results,
+    loading,
+    hasSearched,
+    filters,
+    setFilters,
+    pagination,
+    totalPages,
+    handleSearch,
+    handleKeyDown,
+  } = useEntitySearchPage<Empresa, EmpresaSearchState>({
+    defaultFilters: DEFAULT_FILTERS,
+    search: searchEmpresas,
+  });
+
+  const columns: EntityTableColumn<Empresa>[] = [
+    { id: "codigo", header: "Código", sortable: true, sortValue: (item) => item.codigo || 0, render: (item) => item.codigo || "-" },
+    { id: "nomeempresa", header: "Nome da Empresa", sortable: true, sortValue: (item) => item.nomeempresa || "", render: (item) => item.nomeempresa },
+    { id: "codgrupoempresa", header: "Código do Grupo", sortable: true, sortValue: (item) => item.codgrupoempresa || "", render: (item) => item.codgrupoempresa || "-" },
+    { id: "uf", header: "UF", render: (item) => item.uf || "-" },
+    { id: "ativo", header: "Status", sortable: true, sortValue: (item) => item.ativo || "", render: (item) => item.ativo === "S" ? <span className="bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full text-xs font-medium">Ativo</span> : <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-medium">Inativo</span> },
+  ];
+
   return (
-    <div className="p-6">
-      {/* Cabeçalho */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Cadastro de Empresas</h1>
-          <p className="text-lg text-gray-600">Empresas</p>
-        </div>
+    <div className="flex flex-col w-full px-8 py-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-[#0E0E0E]">Empresas</h1>
+      </div>
+
+      <div className="mb-4 flex justify-end gap-3">
         <button
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          onClick={() => router.push("/empresa/novo")}
+          className="bg-[#0048B0] text-white px-5 py-2 rounded-lg hover:bg-[#003c90] transition-colors"
+          onClick={() => setShowCreateModal(true)}
         >
-          Novo
+          + Nova empresa
         </button>
       </div>
 
-      {/* Parâmetros da consulta */}
-      <div className="mb-6 border rounded-lg p-4 bg-gray-50">
-        <h2 className="text-lg font-semibold mb-4">Parâmetros da consulta</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <input
-            placeholder="Código"
-            className="border rounded p-2"
-            value={searchData.codigo}
-            onChange={(e) => setSearchData({ ...searchData, codigo: e.target.value })}
-          />
-          <input
-            placeholder="Empresa"
-            className="border rounded p-2"
-            value={searchData.nomeempresa}
-            onChange={(e) => setSearchData({ ...searchData, nomeempresa: e.target.value })}
-          />
-          <input
-            placeholder="Codigo do Grupo"
-            className="border rounded p-2"
-            value={searchData.codgrupoempresa}
-            onChange={(e) => setSearchData({ ...searchData, codgrupoempresa: e.target.value })}
-          />
-          <div className="flex gap-2">
-            <input
-              placeholder="CNPJ"
-              className="flex-1 border rounded p-2"
-              value={searchData.nucnpj}
-              onChange={(e) => setSearchData({ ...searchData, nucnpj: e.target.value })}
-            />
-            <input
-              placeholder="UF"
-              className="w-20 border rounded p-2"
-              value={searchData.uf}
-              onChange={(e) => setSearchData({ ...searchData, uf: e.target.value })}
-            />
-          </div>
-          <select
-            className="border rounded p-2"
-            value={searchData.ativo}
-            onChange={(e) => setSearchData({ ...searchData, ativo: e.target.value })}
-          >
-            <option value="Ativo">Ativo</option>
-            <option value="Inativo">Inativo</option>
+      <CredorFilters
+        searchData={filters}
+        loading={loading}
+        onSearchChange={setFilters}
+        onKeyDown={handleKeyDown}
+        searchPlaceholder="Buscar empresas por nome ou CNPJ (busca automatica)"
+        searchAriaLabel="Buscar empresas por nome ou CNPJ"
+      />
+
+      <EntityDataTable
+        items={results}
+        loading={loading}
+        hasSearched={hasSearched}
+        columns={columns}
+        getItemId={(item, idx) => item.codigo ?? `empresa-${idx}`}
+        pagination={pagination}
+        totalPages={totalPages}
+        onPageChange={(page) => void handleSearch(filters, page, pagination.pageSize)}
+        onGoToPage={(page) => void handleSearch(filters, page, pagination.pageSize)}
+        onPageSizeChange={(size) => void handleSearch(filters, 1, size)}
+        onPreviousPage={() => void handleSearch(filters, pagination.page - 1, pagination.pageSize)}
+        onNextPage={() => void handleSearch(filters, pagination.page + 1, pagination.pageSize)}
+        onEdit={(item) => router.push(`/empresa/editar/${item.codigo}`)}
+      />
+
+      <EntityCreateModal
+        show={showCreateModal}
+        title="Nova empresa"
+        description="Preencha os dados para cadastrar uma nova empresa."
+        saving={saving}
+        saveLabel="Salvar"
+        onClose={() => setShowCreateModal(false)}
+        onSave={() => void handleCreate()}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Nome da Empresa *" value={newEmpresa.nomeempresa} onChange={(e) => setNewEmpresa((prev) => ({ ...prev, nomeempresa: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Nome Fantasia" value={newEmpresa.nomefantasia || ""} onChange={(e) => setNewEmpresa((prev) => ({ ...prev, nomefantasia: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="CNPJ" value={newEmpresa.nucnpj || ""} onChange={(e) => setNewEmpresa((prev) => ({ ...prev, nucnpj: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Codigo do Grupo" value={newEmpresa.codgrupoempresa || ""} onChange={(e) => setNewEmpresa((prev) => ({ ...prev, codgrupoempresa: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="UF" maxLength={2} value={newEmpresa.uf || ""} onChange={(e) => setNewEmpresa((prev) => ({ ...prev, uf: e.target.value.toUpperCase() }))} />
+          <select className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#0048B0]" value={newEmpresa.ativo} onChange={(e) => setNewEmpresa((prev) => ({ ...prev, ativo: e.target.value }))}>
+            <option value="S">Ativo</option>
+            <option value="N">Inativo</option>
           </select>
         </div>
-        <div className="mt-4">
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
-            onClick={handleSearch}
-            disabled={loading}
-          >
-            {loading ? "Pesquisando..." : "Pesquisar"}
-          </button>
-        </div>
-      </div>
-
-      {/* Grid de resultados */}
-      <div className="overflow-x-auto border rounded-lg">
-        <table className="w-full border-collapse">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-4 py-2 text-left">Código</th>
-              <th className="border px-4 py-2 text-left">Nome da Empresa</th>
-              <th className="border px-4 py-2 text-left">Código do Grupo</th>
-              <th className="border px-4 py-2 text-left">UF</th>
-              <th className="border px-4 py-2 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="border px-4 py-6 text-center text-gray-500"
-                >
-                  Nenhum registro encontrado
-                </td>
-              </tr>
-            ) : (
-              results.map((item, idx) => (
-                <tr key={idx} className="hover:bg-gray-50">
-                  <td className="border px-4 py-2">{item.codigo || "-"}</td>
-                  <td className="border px-4 py-2">{item.nomeempresa}</td>
-                  <td className="border px-4 py-2">{item.codgrupoempresa}</td>
-                  <td className="border px-4 py-2">{item.uf}</td>
-                  <td className="border px-4 py-2">{item.ativo}</td>
-                  <td className="border px-4 py-2">
-                    <button
-                      className="text-blue-600 hover:underline"
-                      onClick={() =>
-                        router.push(`/empresa/editar/${item.codigo}`)
-                      }
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      </EntityCreateModal>
     </div>
   );
 }
+
+

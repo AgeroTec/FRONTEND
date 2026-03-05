@@ -1,249 +1,171 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { contaCorrenteService } from "@/application/services/ContaCorrenteService";
+import { useCallback, useState } from "react";
 import { ContaCorrente } from "@/domain/entities/ContaCorrente";
+import { contaCorrenteService } from "@/infrastructure/di/services";
+import { EntityDataTable, EntityTableColumn } from "@/presentation/components/Common/EntityDataTable";
+import { CredorFilters } from "@/presentation/components/Credor/CredorFilters";
+import { useEntitySearchPage } from "@/presentation/hooks/common/useEntitySearchPage";
+import { EntityCreateModal } from "@/presentation/components/Common/EntityCreateModal";
+import { toast } from "sonner";
+import { createContaCorrenteSchema, getFirstValidationError } from "@/domain/schemas/cadastroSchemas";
+
+type ContaCorrenteSearchState = {
+  search: string;
+  ativo: string;
+  consistencia?: string;
+};
+
+const DEFAULT_FILTERS: ContaCorrenteSearchState = {
+  search: "",
+  ativo: "",
+  consistencia: "",
+};
 
 export default function ContasCorrentesPage() {
-  const router = useRouter();
-  const [results, setResults] = useState<ContaCorrente[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchData, setSearchData] = useState({
-    codigo: "",
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newConta, setNewConta] = useState({
     nomeconta: "",
-    cdempresa: "",
     banco: "",
-    codigoBanco: "",
     agencia: "",
     conta: "",
     digito: "",
-    tipoConta: "",
-    titular: "",
-    cnpjTitular: "",
-    tipoPessoa: "",
-    saldoInicial: "",
-    dataAbertura: "",
-    ativo: "",
   });
 
-  const handleSearch = async () => {
-    setLoading(true);
-    try {
-      const response = await contaCorrenteService.searchContasCorrentes.execute(searchData);
-      setResults(response.items || []);
+  const searchContas = useCallback(async (params: ContaCorrenteSearchState & { page: number; pageSize: number }) => {
+    const response = await contaCorrenteService.searchContasCorrentes.execute({
+      searchTerm: params.search || undefined,
+      ativo: params.ativo || undefined,
+      page: params.page,
+      pageSize: params.pageSize,
+    });
 
-      if (response.items && response.items.length > 0) {
-        toast.success(`${response.items.length} conta(s) encontrada(s)`);
-      } else {
-        toast.info("Nenhuma conta corrente encontrada");
-      }
+    return {
+      items: response.items || [],
+      total: response.total || 0,
+    };
+  }, []);
+
+  const handleCreate = async () => {
+    const validation = createContaCorrenteSchema.safeParse({ ...newConta, ativo: "S" });
+    if (!validation.success) {
+      toast.error(getFirstValidationError(validation.error, "Dados invalidos para cadastro de conta corrente"));
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await contaCorrenteService.createContaCorrente.execute({
+        nomeconta: newConta.nomeconta.trim(),
+        banco: newConta.banco.trim(),
+        agencia: newConta.agencia.trim(),
+        conta: newConta.conta.trim(),
+        digito: newConta.digito.trim() || undefined,
+        ativo: "S",
+      });
+      toast.success("Conta corrente cadastrada com sucesso!");
+      setShowCreateModal(false);
+      setNewConta({ nomeconta: "", banco: "", agencia: "", conta: "", digito: "" });
+      await handleSearch(filters, 1, pagination.pageSize);
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível conectar ao servidor."
-      );
-      setResults([]);
+      toast.error(error instanceof Error ? error.message : "Erro ao salvar conta corrente");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  const {
+    results,
+    loading,
+    hasSearched,
+    filters,
+    setFilters,
+    pagination,
+    totalPages,
+    handleSearch,
+    handleKeyDown,
+  } = useEntitySearchPage<ContaCorrente, ContaCorrenteSearchState>({
+    defaultFilters: DEFAULT_FILTERS,
+    search: searchContas,
+  });
+
+  const columns: EntityTableColumn<ContaCorrente>[] = [
+    { id: "codigo", header: "Código", sortable: true, sortValue: (item) => item.codigo || 0, render: (item) => item.codigo || "-" },
+    { id: "nomeconta", header: "Nome da Conta", sortable: true, sortValue: (item) => item.nomeconta || "", render: (item) => item.nomeconta || "-" },
+    { id: "empresa", header: "Empresa", sortable: true, sortValue: (item) => item.nomeempresa || "", render: (item) => item.nomeempresa || "-" },
+    { id: "banco", header: "Banco", sortable: true, sortValue: (item) => item.banco || "", render: (item) => item.banco || "-" },
+    {
+      id: "agenciaConta",
+      header: "Agência / Conta",
+      render: (item) => {
+        const agencia = item.agencia || "-";
+        const conta = item.conta || "-";
+        const digito = item.digito ? `-${item.digito}` : "";
+        return `${agencia} / ${conta}${digito}`;
+      },
+    },
+    { id: "titular", header: "Titular", sortable: true, sortValue: (item) => item.titular || "", render: (item) => item.titular || "-" },
+    { id: "tipoConta", header: "Tipo", sortable: true, sortValue: (item) => item.tipoConta || "", render: (item) => item.tipoConta || "-" },
+    { id: "ativo", header: "Status", sortable: true, sortValue: (item) => item.ativo || "", render: (item) => item.ativo === "S" ? <span className="bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full text-xs font-medium">Ativo</span> : <span className="bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full text-xs font-medium">Inativo</span> },
+  ];
+
   return (
-    <div className="p-6">
-      {/* Cabeçalho */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Cadastro de Contas Correntes</h1>
-          <p className="text-lg text-gray-600">Contas Bancárias das Empresas</p>
-        </div>
+    <div className="flex flex-col w-full px-8 py-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-[#0E0E0E]">Contas Correntes</h1>
+      </div>
+
+      <div className="mb-4 flex justify-end gap-3">
         <button
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-          onClick={() => router.push("/contacorrente/novo")}
+          className="bg-[#0048B0] text-white px-5 py-2 rounded-lg hover:bg-[#003c90] transition-colors"
+          onClick={() => setShowCreateModal(true)}
         >
-          Novo
+          + Nova conta corrente
         </button>
       </div>
 
-      {/* Parâmetros da consulta */}
-      <div className="mb-6 border rounded-lg p-4 bg-gray-50">
-        <h2 className="text-lg font-semibold mb-4">Parâmetros da consulta</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <input
-            placeholder="Código"
-            className="border rounded p-2"
-            value={searchData.codigo}
-            onChange={(e) => setSearchData({ ...searchData, codigo: e.target.value })}
-          />
-          <input
-            placeholder="Nome da Conta"
-            className="border rounded p-2"
-            value={searchData.nomeconta}
-            onChange={(e) => setSearchData({ ...searchData, nomeconta: e.target.value })}
-          />
-          <input
-            placeholder="Código da Empresa"
-            className="border rounded p-2"
-            value={searchData.cdempresa}
-            onChange={(e) => setSearchData({ ...searchData, cdempresa: e.target.value })}
-          />
-          <input
-            placeholder="Banco"
-            className="border rounded p-2"
-            value={searchData.banco}
-            onChange={(e) => setSearchData({ ...searchData, banco: e.target.value })}
-          />
-          <input
-            placeholder="Código do Banco"
-            className="border rounded p-2"
-            value={searchData.codigoBanco}
-            onChange={(e) => setSearchData({ ...searchData, codigoBanco: e.target.value })}
-          />
-          <div className="flex gap-2">
-            <input
-              placeholder="Agência"
-              className="flex-1 border rounded p-2"
-              value={searchData.agencia}
-              onChange={(e) => setSearchData({ ...searchData, agencia: e.target.value })}
-            />
-            <input
-              placeholder="Conta"
-              className="flex-1 border rounded p-2"
-              value={searchData.conta}
-              onChange={(e) => setSearchData({ ...searchData, conta: e.target.value })}
-            />
-            <input
-              placeholder="Dígito"
-              className="w-20 border rounded p-2"
-              value={searchData.digito}
-              onChange={(e) => setSearchData({ ...searchData, digito: e.target.value })}
-            />
-          </div>
-          <select
-            className="border rounded p-2"
-            value={searchData.tipoConta}
-            onChange={(e) => setSearchData({ ...searchData, tipoConta: e.target.value })}
-          >
-            <option value="">Tipo de Conta</option>
-            <option value="Corrente">Corrente</option>
-            <option value="Aplicacao">Aplicação</option>
-            <option value="Poupanca">Poupança</option>
-          </select>
-          <input
-            placeholder="Titular"
-            className="border rounded p-2"
-            value={searchData.titular}
-            onChange={(e) => setSearchData({ ...searchData, titular: e.target.value })}
-          />
-          <input
-            placeholder="CNPJ do Titular"
-            className="border rounded p-2"
-            value={searchData.cnpjTitular}
-            onChange={(e) => setSearchData({ ...searchData, cnpjTitular: e.target.value })}
-          />
-          <select
-            className="border rounded p-2"
-            value={searchData.tipoPessoa}
-            onChange={(e) => setSearchData({ ...searchData, tipoPessoa: e.target.value })}
-          >
-            <option value="">Tipo de Pessoa</option>
-            <option value="PJ">Pessoa Jurídica</option>
-            <option value="PF">Pessoa Física</option>
-          </select>
-          <input
-            placeholder="Saldo Inicial"
-            type="number"
-            className="border rounded p-2"
-            value={searchData.saldoInicial}
-            onChange={(e) => setSearchData({ ...searchData, saldoInicial: e.target.value })}
-          />
-          <input
-            placeholder="Data de Abertura"
-            type="date"
-            className="border rounded p-2"
-            value={searchData.dataAbertura}
-            onChange={(e) => setSearchData({ ...searchData, dataAbertura: e.target.value })}
-          />
-          <select
-            className="border rounded p-2"
-            value={searchData.ativo}
-            onChange={(e) => setSearchData({ ...searchData, ativo: e.target.value })}
-          >
-            <option value="">Status</option>
-            <option value="true">Ativo</option>
-            <option value="false">Inativo</option>
-          </select>
-        </div>
-        <div className="mt-4">
-          <button
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
-            onClick={handleSearch}
-            disabled={loading}
-          >
-            {loading ? "Pesquisando..." : "Pesquisar"}
-          </button>
-        </div>
-      </div>
+      <CredorFilters
+        searchData={filters}
+        loading={loading}
+        onSearchChange={setFilters}
+        onKeyDown={handleKeyDown}
+        searchPlaceholder="Buscar contas correntes por nome da conta (busca automatica)"
+        searchAriaLabel="Buscar contas correntes por nome da conta"
+      />
 
-      {/* Grid de resultados */}
-      <div className="overflow-x-auto border rounded-lg">
-        <table className="w-full border-collapse">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-4 py-2 text-left">Código</th>
-              <th className="border px-4 py-2 text-left">Nome da Conta</th>
-              <th className="border px-4 py-2 text-left">Banco</th>
-              <th className="border px-4 py-2 text-left">Agência / Conta</th>
-              <th className="border px-4 py-2 text-left">Titular</th>
-              <th className="border px-4 py-2 text-left">CNPJ</th>
-              <th className="border px-4 py-2 text-left">Tipo</th>
-              <th className="border px-4 py-2 text-left">Status</th>
-              <th className="border px-4 py-2 text-left">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={9}
-                  className="border px-4 py-6 text-center text-gray-500"
-                >
-                  Nenhum registro encontrado
-                </td>
-              </tr>
-            ) : (
-              results.map((item, idx) => (
-                <tr key={idx} className="hover:bg-gray-50">
-                  <td className="border px-4 py-2">{item.codigo || "-"}</td>
-                  <td className="border px-4 py-2">{item.nomeconta}</td>
-                  <td className="border px-4 py-2">{item.banco}</td>
-                  <td className="border px-4 py-2">
-                    {item.agencia} / {item.conta}-{item.digito}
-                  </td>
-                  <td className="border px-4 py-2">{item.titular}</td>
-                  <td className="border px-4 py-2">{item.cnpjTitular}</td>
-                  <td className="border px-4 py-2">{item.tipoConta}</td>
-                  <td className="border px-4 py-2">
-                    {item.ativo ? "Ativo" : "Inativo"}
-                  </td>
-                  <td className="border px-4 py-2">
-                    <button
-                      className="text-blue-600 hover:underline"
-                      onClick={() =>
-                        router.push(`/contascorrentes/editar/${item.codigo}`)
-                      }
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <EntityDataTable
+        items={results}
+        loading={loading}
+        hasSearched={hasSearched}
+        columns={columns}
+        getItemId={(item, idx) => item.codigo ?? `conta-${idx}`}
+        pagination={pagination}
+        totalPages={totalPages}
+        onPageChange={(page) => void handleSearch(filters, page, pagination.pageSize)}
+        onGoToPage={(page) => void handleSearch(filters, page, pagination.pageSize)}
+        onPageSizeChange={(size) => void handleSearch(filters, 1, size)}
+        onPreviousPage={() => void handleSearch(filters, pagination.page - 1, pagination.pageSize)}
+        onNextPage={() => void handleSearch(filters, pagination.page + 1, pagination.pageSize)}
+      />
+
+      <EntityCreateModal
+        show={showCreateModal}
+        title="Nova conta corrente"
+        description="Preencha os dados para cadastrar uma nova conta corrente."
+        saving={saving}
+        saveLabel="Salvar"
+        onClose={() => setShowCreateModal(false)}
+        onSave={() => void handleCreate()}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Nome da Conta *" value={newConta.nomeconta} onChange={(e) => setNewConta((prev) => ({ ...prev, nomeconta: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Banco *" value={newConta.banco} onChange={(e) => setNewConta((prev) => ({ ...prev, banco: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Agencia *" value={newConta.agencia} onChange={(e) => setNewConta((prev) => ({ ...prev, agencia: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Conta *" value={newConta.conta} onChange={(e) => setNewConta((prev) => ({ ...prev, conta: e.target.value }))} />
+          <input className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]" placeholder="Digito" value={newConta.digito} onChange={(e) => setNewConta((prev) => ({ ...prev, digito: e.target.value }))} />
+        </div>
+      </EntityCreateModal>
     </div>
   );
 }

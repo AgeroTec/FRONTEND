@@ -1,22 +1,26 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Credor } from "@/domain/entities/Credor";
-import { credorService } from "@/application/services/CredorService";
+import { credorService } from "@/infrastructure/di/services";
 
-type SortField = 'codigo' | 'nome' | 'cnpj' | 'cpf' | 'ativo' | null;
-type SortOrder = 'asc' | 'desc';
+type SortField = "codigo" | "nome" | "cnpj" | "cpf" | "ativo" | null;
+type SortOrder = "asc" | "desc";
+
+type CredorFilters = { search: string; ativo: string; consistencia?: string };
+type PaginationState = { page: number; pageSize: number; total: number };
 
 interface UseCredorListReturn {
   results: Credor[];
   loading: boolean;
-  searchData: { search: string; ativo: string; consistencia?: string };
-  pagination: { page: number; pageSize: number; total: number };
+  searchData: CredorFilters;
+  pagination: PaginationState;
   sortField: SortField;
   sortOrder: SortOrder;
   selectedIds: Set<number>;
   allSelected: boolean;
   someSelected: boolean;
-  setSearchData: (data: { search: string; ativo: string; consistencia?: string }) => void;
+  setSearchData: (data: CredorFilters) => void;
   handleSearch: (page?: number) => Promise<void>;
   clearFilters: () => void;
   handleSort: (field: SortField) => void;
@@ -30,102 +34,184 @@ interface UseCredorListReturn {
   clearSelection: () => void;
 }
 
+function getInitialFilters(): CredorFilters {
+  if (typeof window === "undefined") {
+    return { search: "", ativo: "S", consistencia: "" };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return {
+    search: params.get("q") ?? "",
+    ativo: params.get("ativo") ?? "S",
+    consistencia: params.get("consistencia") ?? "",
+  };
+}
+
+function getInitialPagination(): PaginationState {
+  if (typeof window === "undefined") {
+    return { page: 1, pageSize: 20, total: 0 };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const page = Number(params.get("page") ?? "1");
+  const pageSize = Number(params.get("pageSize") ?? "20");
+
+  return {
+    page: Number.isFinite(page) && page > 0 ? page : 1,
+    pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 20,
+    total: 0,
+  };
+}
+
 export function useCredorList(): UseCredorListReturn {
-  const [results, setResults] = useState<Credor[]>([]);
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [rawResults, setRawResults] = useState<Credor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchData, setSearchData] = useState({ search: "", ativo: "S", consistencia: "" });
-  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 });
+  const [searchData, setSearchDataState] = useState<CredorFilters>(() => getInitialFilters());
+  const [pagination, setPagination] = useState<PaginationState>(() => getInitialPagination());
   const [sortField, setSortField] = useState<SortField>(null);
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const paginationRef = useRef(pagination);
+  const requestSequenceRef = useRef(0);
+  const searchCacheRef = useRef<Map<string, { items: Credor[]; total: number }>>(new Map());
 
-  // Keep ref in sync with state
+  const syncUrl = useCallback(
+    (filters: CredorFilters, page: number, pageSize: number) => {
+      const params = new URLSearchParams();
+
+      if (filters.search.trim()) params.set("q", filters.search.trim());
+      if (filters.ativo && filters.ativo !== "S") params.set("ativo", filters.ativo);
+      if (filters.consistencia?.trim()) params.set("consistencia", filters.consistencia.trim());
+      if (page > 1) params.set("page", String(page));
+      if (pageSize !== 20) params.set("pageSize", String(pageSize));
+
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router]
+  );
+
   useEffect(() => {
     paginationRef.current = pagination;
   }, [pagination]);
 
-  const handleSearch = useCallback(async (page = 1, customPageSize?: number) => {
-    setLoading(true);
-    try {
+  const handleSearch = useCallback(
+    async (page = 1, customPageSize?: number) => {
       const pageSize = customPageSize ?? paginationRef.current.pageSize;
-      const params = {
-        searchTerm: searchData.search || undefined,
-        ativo: searchData.ativo || undefined,
+      const seq = ++requestSequenceRef.current;
+      const cacheKey = JSON.stringify({
+        q: searchData.search || "",
+        ativo: searchData.ativo || "",
         page,
         pageSize,
-      };
+      });
 
-      const result = await credorService.search.execute(params);
+      const cached = searchCacheRef.current.get(cacheKey);
+      if (cached) {
+        setRawResults(cached.items);
+        setPagination({ page, pageSize, total: cached.total });
+        setLoading(false);
+        syncUrl(searchData, page, pageSize);
+        return;
+      }
 
-      setRawResults(result.items);
-      setPagination({ page, pageSize, total: result.total });
-    } catch (error) {
-      toast.error("Erro ao buscar credores. Tente novamente.");
-      setRawResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchData.search, searchData.ativo, searchData.consistencia]);
+      setLoading(true);
+      syncUrl(searchData, page, pageSize);
+
+      try {
+        const result = await credorService.search.execute({
+          searchTerm: searchData.search || undefined,
+          ativo: searchData.ativo || undefined,
+          page,
+          pageSize,
+        });
+
+        if (seq !== requestSequenceRef.current) return;
+
+        searchCacheRef.current.set(cacheKey, {
+          items: result.items,
+          total: result.total,
+        });
+        setRawResults(result.items);
+        setPagination({ page, pageSize, total: result.total });
+      } catch {
+        if (seq !== requestSequenceRef.current) return;
+        toast.error("Erro ao buscar credores. Tente novamente.");
+        setRawResults([]);
+      } finally {
+        if (seq === requestSequenceRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [searchData, syncUrl]
+  );
 
   const sortedResults = useMemo(() => {
     if (!sortField) return rawResults;
 
-    const sorted = [...rawResults].sort((a, b) => {
-      let aValue: string | number = '';
-      let bValue: string | number = '';
+    return [...rawResults].sort((a, b) => {
+      let aValue: string | number = "";
+      let bValue: string | number = "";
 
       switch (sortField) {
-        case 'codigo':
+        case "codigo":
           aValue = a.codigo || 0;
           bValue = b.codigo || 0;
           break;
-        case 'nome':
+        case "nome":
           aValue = a.nome.toLowerCase();
           bValue = b.nome.toLowerCase();
           break;
-        case 'cnpj':
-          aValue = a.cnpj || '';
-          bValue = b.cnpj || '';
+        case "cnpj":
+          aValue = a.cnpj || "";
+          bValue = b.cnpj || "";
           break;
-        case 'cpf':
-          aValue = a.cpf || '';
-          bValue = b.cpf || '';
+        case "cpf":
+          aValue = a.cpf || "";
+          bValue = b.cpf || "";
           break;
-        case 'ativo':
+        case "ativo":
           aValue = a.ativo;
           bValue = b.ativo;
           break;
       }
 
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
-
-    return sorted;
   }, [rawResults, sortField, sortOrder]);
 
-  useEffect(() => {
-    setResults(sortedResults);
-  }, [sortedResults]);
+  const handleSort = useCallback(
+    (field: SortField) => {
+      if (sortField === field) {
+        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+        return;
+      }
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
       setSortField(field);
-      setSortOrder('asc');
-    }
-  };
+      setSortOrder("asc");
+    },
+    [sortField]
+  );
 
-  const clearFilters = () => {
-    setSearchData({ search: "", ativo: "S", consistencia: "" });
+  const setSearchData = useCallback((data: CredorFilters) => {
+    setSearchDataState(data);
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setSearchDataState({ search: "", ativo: "S", consistencia: "" });
     setSortField(null);
-    setSortOrder('asc');
-  };
+    setSortOrder("asc");
+    setSelectedIds(new Set());
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, []);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -133,69 +219,122 @@ export function useCredorList(): UseCredorListReturn {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      handleSearch(1);
-    }, 500);
+      void handleSearch(1);
+    }, 400);
 
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchData.search, searchData.ativo, searchData.consistencia]);
-
-  const totalPages = Math.ceil(pagination.total / pagination.pageSize);
-
-  const setPageSize = useCallback((size: number) => {
-    setPagination(prev => ({ ...prev, pageSize: size, page: 1 }));
-    handleSearch(1, size);
   }, [handleSearch]);
 
-  const goToPage = useCallback((page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      handleSearch(page);
-    }
-  }, [handleSearch, totalPages]);
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.pageSize));
 
-  const handleDelete = useCallback(async (credor: Credor) => {
-    if (!credor.codigo) {
-      toast.error("Credor sem código identificador");
-      return;
-    }
+  const setPageSize = useCallback(
+    (size: number) => {
+      setPagination((prev) => ({ ...prev, pageSize: size, page: 1 }));
+      void handleSearch(1, size);
+    },
+    [handleSearch]
+  );
 
-    try {
-      await credorService.delete.execute(credor.codigo);
-      toast.success("Credor excluído com sucesso!");
-      handleSearch(pagination.page);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erro ao excluir credor";
-      toast.error(message);
-    }
-  }, [handleSearch, pagination.page]);
+  const goToPage = useCallback(
+    (page: number) => {
+      if (page >= 1 && page <= totalPages) {
+        void handleSearch(page);
+      }
+    },
+    [handleSearch, totalPages]
+  );
 
-  const handleToggleStatus = useCallback(async (credor: Credor) => {
-    if (!credor.codigo) {
-      toast.error("Credor sem código identificador");
-      return;
-    }
+  const handleDelete = useCallback(
+    async (credor: Credor) => {
+      if (!credor.codigo) {
+        toast.error("Credor sem codigo identificador");
+        return;
+      }
 
-    const newStatus = credor.ativo === "S" ? "N" : "S";
-    const action = newStatus === "S" ? "ativado" : "inativado";
+      const removedId = credor.codigo;
+      const previousResults = rawResults;
+      const previousPagination = pagination;
+      const previousSelectedIds = new Set(selectedIds);
 
-    try {
-      await credorService.toggleStatus.execute(credor.codigo, newStatus);
-      toast.success(`Credor ${action} com sucesso!`);
-      handleSearch(pagination.page);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : `Erro ao ${action === "ativado" ? "ativar" : "inativar"} credor`;
-      toast.error(message);
-    }
-  }, [handleSearch, pagination.page]);
+      setRawResults((prev) => prev.filter((item) => item.codigo !== removedId));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(removedId);
+        return next;
+      });
+      setPagination((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
 
-  // Seleção em massa
+      try {
+        await credorService.delete.execute(removedId);
+        searchCacheRef.current.clear();
+        toast.success("Credor excluido com sucesso!");
+
+        const currentPageItemCount = previousResults.filter((item) => item.codigo !== removedId).length;
+        if (currentPageItemCount === 0 && previousPagination.page > 1) {
+          void handleSearch(previousPagination.page - 1);
+        }
+      } catch (error) {
+        setRawResults(previousResults);
+        setPagination(previousPagination);
+        setSelectedIds(previousSelectedIds);
+
+        const message = error instanceof Error ? error.message : "Erro ao excluir credor";
+        toast.error(message);
+      }
+    },
+    [handleSearch, pagination, rawResults, selectedIds]
+  );
+
+  const handleToggleStatus = useCallback(
+    async (credor: Credor) => {
+      if (!credor.codigo) {
+        toast.error("Credor sem codigo identificador");
+        return;
+      }
+
+      const credorId = credor.codigo;
+      const newStatus = credor.ativo === "S" ? "N" : "S";
+      const action = newStatus === "S" ? "ativado" : "inativado";
+
+      setRawResults((prev) =>
+        prev.map((item) => (item.codigo === credorId ? { ...item, ativo: newStatus } : item))
+      );
+
+      try {
+        const updatedCredor = await credorService.toggleStatus.execute(credorId, newStatus);
+        searchCacheRef.current.clear();
+
+        setRawResults((prev) =>
+          prev.map((item) => (item.codigo === credorId ? { ...item, ...updatedCredor } : item))
+        );
+
+        toast.success(`Credor ${action} com sucesso!`);
+      } catch (error) {
+        setRawResults((prev) =>
+          prev.map((item) => (item.codigo === credorId ? { ...item, ativo: credor.ativo } : item))
+        );
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : `Erro ao ${action === "ativado" ? "ativar" : "inativar"} credor`;
+        toast.error(message);
+      }
+    },
+    []
+  );
+
   const allSelected = useMemo(() => {
-    const credoresComCodigo = results.filter(c => c.codigo);
-    return credoresComCodigo.length > 0 && credoresComCodigo.every(c => selectedIds.has(c.codigo!));
-  }, [results, selectedIds]);
+    const credoresComCodigo = sortedResults.filter((credor) => credor.codigo);
+    return (
+      credoresComCodigo.length > 0 &&
+      credoresComCodigo.every((credor) => selectedIds.has(credor.codigo!))
+    );
+  }, [selectedIds, sortedResults]);
 
   const someSelected = useMemo(() => {
     return selectedIds.size > 0 && !allSelected;
@@ -204,24 +343,27 @@ export function useCredorList(): UseCredorListReturn {
   const toggleSelectAll = useCallback(() => {
     if (allSelected) {
       setSelectedIds(new Set());
-    } else {
-      const newSelectedIds = new Set<number>();
-      results.forEach(c => {
-        if (c.codigo) newSelectedIds.add(c.codigo);
-      });
-      setSelectedIds(newSelectedIds);
+      return;
     }
-  }, [allSelected, results]);
+
+    const newSelectedIds = new Set<number>();
+    sortedResults.forEach((credor) => {
+      if (credor.codigo) {
+        newSelectedIds.add(credor.codigo);
+      }
+    });
+    setSelectedIds(newSelectedIds);
+  }, [allSelected, sortedResults]);
 
   const toggleSelectOne = useCallback((id: number) => {
-    setSelectedIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
       } else {
-        newSet.add(id);
+        next.add(id);
       }
-      return newSet;
+      return next;
     });
   }, []);
 
@@ -230,7 +372,7 @@ export function useCredorList(): UseCredorListReturn {
   }, []);
 
   return {
-    results,
+    results: sortedResults,
     loading,
     searchData,
     pagination,

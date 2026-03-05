@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Credor } from "@/domain/entities/Credor";
-import { formatCNPJ, formatCPF, removeMask, validateCNPJ, validateCPF } from "@/presentation/utils/documentUtils";
+import { formatCNPJ, formatCPF, removeMask } from "@/domain/utils/documentUtils";
 
 interface CredorDrawerProps {
   show: boolean;
@@ -62,6 +62,7 @@ export function CredorDrawer({ show, credor, onClose, onSave, onDelete, onToggle
         fantasia: credor.fantasia || '',
         cnpj: credor.cnpj || '',
         cpf: credor.cpf || '',
+        cdContaCorrente: credor.cdContaCorrente,
         tipoPessoa: credor.tipoPessoa || (credor.cnpj ? 'juridica' : 'fisica'),
         tipoCredor: credor.tipoCredor || 'corretor',
         microempresa: credor.microempresa || false,
@@ -81,6 +82,7 @@ export function CredorDrawer({ show, credor, onClose, onSave, onDelete, onToggle
         fantasia: credor?.fantasia || '',
         cnpj: credor?.cnpj || '',
         cpf: credor?.cpf || '',
+        cdContaCorrente: credor?.cdContaCorrente,
         tipoPessoa: credor?.tipoPessoa || (credor?.cnpj ? 'juridica' : 'fisica'),
         tipoCredor: credor?.tipoCredor || 'corretor',
         microempresa: credor?.microempresa || false,
@@ -98,14 +100,14 @@ export function CredorDrawer({ show, credor, onClose, onSave, onDelete, onToggle
     try {
       await onSave(credor.codigo, editedData);
       setIsEditing(false);
-    } catch (error) {
+    } catch {
       // Error handling is done in parent component
     } finally {
       setSaving(false);
     }
   };
 
-  const handleFieldChange = (field: keyof Credor, value: string | boolean) => {
+  const handleFieldChange = (field: keyof Credor, value: string | boolean | number | undefined) => {
     setEditedData(prev => ({
       ...prev,
       [field]: value,
@@ -536,6 +538,35 @@ export function CredorDrawer({ show, credor, onClose, onSave, onDelete, onToggle
                     ) : (
                       <div className="text-base text-gray-900 px-3 py-2">
                         {credor.fantasia || '-'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conta Corrente */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Código Conta Corrente
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={
+                          editedData.cdContaCorrente !== undefined
+                            ? String(editedData.cdContaCorrente)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const onlyNumbers = e.target.value.replace(/\D/g, '');
+                          handleFieldChange('cdContaCorrente', onlyNumbers ? Number(onlyNumbers) : undefined);
+                        }}
+                        placeholder="Informe o código da conta corrente"
+                        className="w-full text-base text-gray-900 bg-white px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0048B0]"
+                        disabled={saving}
+                      />
+                    ) : (
+                      <div className="text-base text-gray-900 px-3 py-2">
+                        {credor.cdContaCorrente ?? '-'}
                       </div>
                     )}
                   </div>

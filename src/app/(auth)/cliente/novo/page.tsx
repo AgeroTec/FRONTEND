@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { clienteService } from "@/application/services/ClienteService";
+import { clienteService } from "@/infrastructure/di/services";
 import { Cliente } from "@/domain/entities/Cliente";
 
 export default function NovoClientePage() {
@@ -18,7 +18,7 @@ export default function NovoClientePage() {
     cnpj: "",
     cpf: "",
     tipo: "cliente",
-    ativo: "true",
+    ativo: "S",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,8 +98,8 @@ export default function NovoClientePage() {
           onChange={(e) => setFormData({ ...formData, ativo: e.target.value })}
           required
         >
-          <option value="true">Ativo</option>
-          <option value="false">Inativo</option>
+          <option value="S">Ativo</option>
+          <option value="N">Inativo</option>
         </select>
 
         <div className="col-span-full flex justify-end gap-2 mt-4">

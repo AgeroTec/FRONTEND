@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { centroCustoService } from "@/application/services/CentroCustoService";
+import { centroCustoService } from "@/infrastructure/di/services";
 import { CentroCusto } from "@/domain/entities/CentroCusto";
 
 export default function NovoCentroDeCustoPage() {
@@ -13,7 +13,7 @@ export default function NovoCentroDeCustoPage() {
   const [formData, setFormData] = useState<CentroCusto>({
     nomecentrocusto: "",
     nomeempresa: "",
-    ativo: "true",
+    ativo: "S",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,8 +59,8 @@ export default function NovoCentroDeCustoPage() {
           onChange={(e) => setFormData({ ...formData, ativo: e.target.value })}
           required
         >
-          <option value="true">Ativo</option>
-          <option value="false">Inativo</option>
+          <option value="S">Ativo</option>
+          <option value="N">Inativo</option>
         </select>
 
         <div className="col-span-full flex justify-end gap-2 mt-4">

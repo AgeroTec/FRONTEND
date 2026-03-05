@@ -1,26 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/presentation/stores/authStore";
 import { LoginForm } from "@/presentation/components/LoginForm";
+
+const SESSION_EXPIRED_MESSAGE_KEY = "auth:session-expired-message";
 
 export default function LoginPage() {
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const loginStore = useAuthStore((s) => s.login);
+  const checkAuth = useAuthStore((s) => s.checkAuth);
 
-  const handleSubmit = async (usuario: string, senha: string) => {
+  const returnTo = useMemo(() => {
+    const requested = searchParams.get("returnTo");
+    if (!requested || !requested.startsWith("/") || requested.startsWith("//")) return "/home";
+    if (requested.startsWith("/login")) return "/home";
+    return requested;
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (checkAuth()) {
+      router.replace(returnTo);
+    }
+  }, [checkAuth, returnTo, router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const expiredMessage = sessionStorage.getItem(SESSION_EXPIRED_MESSAGE_KEY);
+    if (expiredMessage) {
+      setErro(expiredMessage);
+      sessionStorage.removeItem(SESSION_EXPIRED_MESSAGE_KEY);
+    }
+  }, []);
+
+  const handleSubmit = async (usuario: string, senha: string, rememberMe: boolean) => {
     setLoading(true);
     setErro("");
 
     try {
-      await loginStore(usuario, senha);
-
-      setTimeout(() => {
-        router.push("/home");
-      }, 200);
+      await loginStore(usuario, senha, rememberMe);
+      router.replace(returnTo);
     } catch (err) {
       if (err instanceof Error) {
         setErro(err.message);
@@ -50,7 +74,7 @@ export default function LoginPage() {
           </div>
 
           <div className="text-sm text-blue-300">
-            Popriedade de Agero Tecnologia Ltda.
+            Propriedade de Agero Tecnologia Ltda.
           </div>
         </div>
       </div>

@@ -5,6 +5,8 @@ import { apiClient } from "../http/apiClient";
 
 interface CredorApiResponse {
   id?: number;
+  cdContaCorrente?: number;
+  CdContaCorrente?: number;
   nome: string;
   fantasia?: string;
   cnpj?: string;
@@ -22,16 +24,21 @@ interface CredorApiResponse {
 export class CredorRepositoryImpl implements ICredorRepository {
   private readonly baseUrl = "/credores";
 
-  private mapToDomain(apiCredor: CredorApiResponse): Credor {
+  private mapToDomain(apiCredor?: CredorApiResponse): Credor {
+    if (!apiCredor) {
+      throw new Error("Resposta invalida do backend para credor.");
+    }
+
     return {
       codigo: apiCredor.id,
+      cdContaCorrente: apiCredor.cdContaCorrente ?? apiCredor.CdContaCorrente,
       nome: apiCredor.nome,
       fantasia: apiCredor.fantasia,
       cnpj: apiCredor.cnpj,
       cpf: apiCredor.cpf,
       ativo: apiCredor.ativo,
-      tipoPessoa: apiCredor.tipoPessoa as 'fisica' | 'juridica' | undefined,
-      tipoCredor: apiCredor.tipoCredor as 'corretor' | 'fornecedor' | 'prestador' | 'cliente' | 'parceiro' | undefined,
+      tipoPessoa: apiCredor.tipoPessoa as "fisica" | "juridica" | undefined,
+      tipoCredor: apiCredor.tipoCredor as "corretor" | "fornecedor" | "prestador" | "cliente" | "parceiro" | undefined,
       microempresa: apiCredor.microempresa,
       transportadora: apiCredor.transportadora,
       estrangeiro: apiCredor.estrangeiro,
@@ -43,6 +50,7 @@ export class CredorRepositoryImpl implements ICredorRepository {
   private mapToApi(credor: Credor): CredorApiResponse {
     return {
       id: credor.codigo,
+      cdContaCorrente: credor.cdContaCorrente,
       nome: credor.nome,
       fantasia: credor.fantasia,
       cnpj: credor.cnpj,
@@ -67,15 +75,41 @@ export class CredorRepositoryImpl implements ICredorRepository {
       }
     });
 
-    const response = await apiClient.get<PagedResult<CredorApiResponse>>(
+    const response = await apiClient.get<Partial<PagedResult<CredorApiResponse>> & {
+      data?: CredorApiResponse[];
+      itens?: CredorApiResponse[];
+      records?: CredorApiResponse[];
+      totalCount?: number;
+    }>(
       `${this.baseUrl}?${queryParams.toString()}`
     );
 
+    const itemsSource = Array.isArray(response.items)
+      ? response.items
+      : Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.itens)
+          ? response.itens
+          : Array.isArray(response.records)
+            ? response.records
+        : [];
+
+    const items = itemsSource
+      .filter((item): item is CredorApiResponse => !!item)
+      .map((item) => this.mapToDomain(item));
+
+    const total =
+      typeof response.total === "number"
+        ? response.total
+        : typeof response.totalCount === "number"
+          ? response.totalCount
+          : items.length;
+
     return {
-      items: response.items.map(item => this.mapToDomain(item)),
-      total: response.total,
-      page: response.page,
-      pageSize: response.pageSize,
+      items,
+      total,
+      page: typeof response.page === "number" ? response.page : 1,
+      pageSize: typeof response.pageSize === "number" ? response.pageSize : Math.max(items.length, 1),
     };
   }
 
@@ -101,19 +135,23 @@ export class CredorRepositoryImpl implements ICredorRepository {
   }
 
   async patch(id: number, data: Partial<Credor>): Promise<Credor> {
-    // Se está alterando apenas o status ativo, usa o endpoint específico
     if (data.ativo !== undefined && Object.keys(data).length === 1) {
-      const response = await apiClient.patch<CredorApiResponse>(
+      const response = await apiClient.patch<CredorApiResponse | undefined>(
         `${this.baseUrl}/${id}/ativo`,
         { valor: data.ativo }
       );
-      return this.mapToDomain(response);
+
+      if (response) {
+        return this.mapToDomain(response);
+      }
+
+      return await this.getById(id);
     }
 
-    // Para outros campos, usa o endpoint genérico
     const payload: Partial<CredorApiResponse> = {};
 
     if (data.codigo !== undefined) payload.id = data.codigo;
+    if (data.cdContaCorrente !== undefined) payload.cdContaCorrente = data.cdContaCorrente;
     if (data.nome !== undefined) payload.nome = data.nome;
     if (data.fantasia !== undefined) payload.fantasia = data.fantasia;
     if (data.cnpj !== undefined) payload.cnpj = data.cnpj;
@@ -127,9 +165,11 @@ export class CredorRepositoryImpl implements ICredorRepository {
     if (data.dataCadastro !== undefined) payload.dataCadastro = data.dataCadastro;
     if (data.dataAtualizacao !== undefined) payload.dataAtualizacao = data.dataAtualizacao;
 
-    const response = await apiClient.patch<CredorApiResponse>(`${this.baseUrl}/${id}`, payload);
-    return this.mapToDomain(response);
+    const response = await apiClient.patch<CredorApiResponse | undefined>(`${this.baseUrl}/${id}`, payload);
+    if (response) {
+      return this.mapToDomain(response);
+    }
+
+    return await this.getById(id);
   }
 }
-
-export const credorRepository = new CredorRepositoryImpl();

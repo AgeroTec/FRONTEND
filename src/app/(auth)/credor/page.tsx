@@ -3,16 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useCredorList } from "@/presentation/hooks/credor/useCredorList";
 import { useCredorForm } from "@/presentation/hooks/credor/useCredorForm";
+import { useCredorImport } from "@/presentation/hooks/credor/useCredorImport";
 import { CredorHeader } from "@/presentation/components/Credor/CredorHeader";
 import { CredorFilters } from "@/presentation/components/Credor/CredorFilters";
 import { CredorTable } from "@/presentation/components/Credor/CredorTable";
 import { CredorTableSkeleton } from "@/presentation/components/Credor/CredorTableSkeleton";
 import { CredorModal } from "@/presentation/components/Credor/CredorModal";
+import { CredorImportModal } from "@/presentation/components/Credor/CredorImportModal";
 import { SuccessModal } from "@/presentation/components/Credor/SuccessModal";
 import { ErrorModal } from "@/presentation/components/Credor/ErrorModal";
 import { CredorDrawer } from "@/presentation/components/Credor/CredorDrawer";
 import { Credor } from "@/domain/entities/Credor";
-import { credorService } from "@/application/services/CredorService";
+import { credorService } from "@/infrastructure/di/services";
 import { toast } from "sonner";
 
 export default function CredoresPage() {
@@ -57,13 +59,22 @@ export default function CredoresPage() {
     errorMessage,
     openModal,
     closeModal,
-    openEditModal,
     updateField,
     handleSave,
     closeSuccessModal,
     closeErrorModal,
     retryLastAction,
   } = useCredorForm();
+
+  const {
+    showImportModal,
+    importing,
+    fileInputRef,
+    openImportModal,
+    closeImportModal,
+    handleFileImport,
+    downloadTemplate,
+  } = useCredorImport();
 
   // Desativa o skeleton após o primeiro carregamento
   useEffect(() => {
@@ -74,6 +85,26 @@ export default function CredoresPage() {
 
   useEffect(() => {
     const handleGlobalKeyboard = (e: KeyboardEvent) => {
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement | null;
+        const isTypingContext =
+          target?.tagName === "INPUT" ||
+          target?.tagName === "TEXTAREA" ||
+          target?.isContentEditable;
+
+        if (!isTypingContext) {
+          e.preventDefault();
+          searchInputRef.current?.focus();
+        }
+      }
+
+      if (e.key === "Escape") {
+        if (showDrawer) {
+          setShowDrawer(false);
+          setSelectedCredor(null);
+        }
+      }
+
       if ((e.ctrlKey || e.metaKey) && !showModal) {
         switch (e.key.toLowerCase()) {
           case 'f':
@@ -94,16 +125,16 @@ export default function CredoresPage() {
 
     window.addEventListener('keydown', handleGlobalKeyboard);
     return () => window.removeEventListener('keydown', handleGlobalKeyboard);
-  }, [showModal, openModal, clearFilters]);
+  }, [showDrawer, showModal, openModal, clearFilters]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !loading) {
       handleSearch(1);
     }
   };
 
   const onSaveSuccess = () => {
-    handleSearch(pagination.page);
+    void handleSearch(pagination.page);
   };
 
   const handleViewCredor = (credor: Credor) => {
@@ -120,7 +151,7 @@ export default function CredoresPage() {
     try {
       await credorService.patch.execute(id, data);
       toast.success("Credor atualizado com sucesso!");
-      handleSearch(pagination.page);
+      void handleSearch(pagination.page);
       // Atualizar o credor selecionado com os novos dados
       if (selectedCredor) {
         setSelectedCredor({ ...selectedCredor, ...data });
@@ -140,12 +171,10 @@ export default function CredoresPage() {
 
   const handleToggleStatusFromDrawer = async (credor: Credor) => {
     await handleToggleStatus(credor);
-
-    // Update selectedCredor to refresh drawer in real-time
-    if (selectedCredor && selectedCredor.codigo === credor.codigo) {
-      const newStatus = credor.ativo === "S" ? "N" : "S";
-      setSelectedCredor({ ...selectedCredor, ativo: newStatus });
-    }
+    setSelectedCredor((prev) => {
+      if (!prev || prev.codigo !== credor.codigo) return prev;
+      return { ...prev, ativo: prev.ativo === "S" ? "N" : "S" };
+    });
   };
 
   return (
@@ -154,7 +183,7 @@ export default function CredoresPage() {
 
       <div className="mb-4 flex justify-end gap-3">
         <button
-          onClick={() => {/* TODO: Implementar importação */}}
+          onClick={openImportModal}
           className="bg-white text-[#0048B0] px-5 py-2 rounded-lg hover:bg-[#0048B0] hover:text-white transition-colors flex items-center gap-2 shadow-sm"
           aria-label="Importar credores"
         >
@@ -187,10 +216,9 @@ export default function CredoresPage() {
         searchData={searchData}
         loading={loading}
         onSearchChange={setSearchData}
-        onSearch={() => handleSearch(1)}
-        onClear={clearFilters}
-        onKeyPress={handleKeyPress}
+        onKeyDown={handleKeyDown}
         searchInputRef={searchInputRef}
+        showConsistencia={true}
       />
 
       {initialLoad && loading ? (
@@ -230,6 +258,15 @@ export default function CredoresPage() {
         onFieldChange={updateField}
       />
 
+      <CredorImportModal
+        show={showImportModal}
+        importing={importing}
+        fileInputRef={fileInputRef}
+        onClose={closeImportModal}
+        onFileImport={handleFileImport}
+        onDownloadTemplate={downloadTemplate}
+      />
+
       <SuccessModal
         show={showSuccessModal}
         message={successMessage}
@@ -255,3 +292,4 @@ export default function CredoresPage() {
     </div>
   );
 }
+

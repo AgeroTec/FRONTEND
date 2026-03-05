@@ -3,6 +3,10 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --ui-text-primary: #111827;
+  --ui-text-label: #374151;
+  --ui-text-muted: #4b5563;
+  --ui-text-placeholder: #6b7280;
 }
 
 @theme inline {
@@ -23,4 +27,20 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.ui-text-primary {
+  color: var(--ui-text-primary);
+}
+
+.ui-text-label {
+  color: var(--ui-text-label);
+}
+
+.ui-text-muted {
+  color: var(--ui-text-muted);
+}
+
+.ui-placeholder::placeholder {
+  color: var(--ui-text-placeholder);
 }

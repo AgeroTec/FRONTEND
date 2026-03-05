@@ -10,7 +10,7 @@ export class ValidateTokenUseCase {
       }
 
       return await this.authRepository.validateToken(token);
-    } catch (error) {
+    } catch {
       return false;
     }
   }

@@ -13,6 +13,7 @@ interface CredorModalProps {
     cpf: string;
     nome: string;
     fantasia: string;
+    cdContaCorrente: string;
   };
   fieldErrors: {
     cnpj: FieldValidation;
@@ -110,14 +111,14 @@ export function CredorModal({
     >
       <div
         ref={modalRef}
-        className="bg-white w-full max-w-2xl rounded-lg shadow-xl p-6 animate-fadeIn max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-2xl rounded-lg shadow-xl p-6 animate-fadeIn max-h-[90vh] overflow-y-auto !text-[#111827] [&_label]:!text-[#111827] [&_label]:font-semibold [&_input]:!text-[#111827] [&_select]:!text-[#111827] [&_p]:!text-[#4B5563] [&_span]:!text-[#111827]"
       >
         <div className="flex justify-between items-start mb-2">
           <div>
-            <h2 id="modal-title" className="text-xl font-semibold text-[#111827]">
+            <h2 id="modal-title" className="text-xl font-semibold !text-[#111827]">
               {editingId ? "Editar credor" : "Novo credor"}
             </h2>
-            <p id="modal-description" className="text-sm text-[#6B7280]">
+            <p id="modal-description" className="text-sm !text-[#4B5563]">
               {editingId
                 ? "Atualize as informações do credor"
                 : "Preencha os dados para criar um novo credor"}
@@ -231,6 +232,19 @@ export function CredorModal({
               placeholder="Digite o nome fantasia (opcional)"
               value={formData.fantasia}
               onChange={(e) => onFieldChange("fantasia", e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="conta-corrente-input" className="text-sm font-medium text-[#111827]">Código Conta Corrente</label>
+            <input
+              id="conta-corrente-input"
+              type="text"
+              inputMode="numeric"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0048B0]"
+              placeholder="Informe o código da conta corrente (opcional)"
+              value={formData.cdContaCorrente}
+              onChange={(e) => onFieldChange("cdContaCorrente", e.target.value)}
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
-import { useState, FormEvent } from "react";
+import { useEffect, useRef, useState, FormEvent } from "react";
 
 interface LoginFormProps {
-  onSubmit: (login: string, senha: string) => Promise<void>;
+  onSubmit: (login: string, senha: string, rememberMe: boolean) => Promise<void>;
   loading: boolean;
   error?: string;
 }
@@ -9,11 +9,27 @@ interface LoginFormProps {
 export function LoginForm({ onSubmit, loading, error }: LoginFormProps) {
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
-  const [lembrar, setLembrar] = useState(false);
+  const [lembrar, setLembrar] = useState(true);
+  const [capsLockOn, setCapsLockOn] = useState(false);
+  const usuarioRef = useRef<HTMLInputElement>(null);
+  const senhaRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    await onSubmit(usuario, senha);
+    await onSubmit(usuario, senha, lembrar);
+  };
+
+  useEffect(() => {
+    if (!error) return;
+    if (!usuario.trim()) {
+      usuarioRef.current?.focus();
+      return;
+    }
+    senhaRef.current?.focus();
+  }, [error, usuario, senha]);
+
+  const handleCapsLockState = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    setCapsLockOn(event.getModifierState("CapsLock"));
   };
 
   return (
@@ -23,6 +39,7 @@ export function LoginForm({ onSubmit, loading, error }: LoginFormProps) {
           Usuário
         </label>
         <input
+          ref={usuarioRef}
           type="text"
           value={usuario}
           onChange={(e) => setUsuario(e.target.value)}
@@ -38,14 +55,21 @@ export function LoginForm({ onSubmit, loading, error }: LoginFormProps) {
           Senha
         </label>
         <input
+          ref={senhaRef}
           type="password"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
+          onKeyUp={handleCapsLockState}
+          onKeyDown={handleCapsLockState}
+          onBlur={() => setCapsLockOn(false)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Digite sua senha"
           required
           disabled={loading}
         />
+        {capsLockOn && (
+          <p className="mt-2 text-sm text-amber-700">Caps Lock ativado.</p>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
@@ -80,23 +104,6 @@ export function LoginForm({ onSubmit, loading, error }: LoginFormProps) {
       >
         {loading ? "Entrando..." : "Entrar"}
       </button>
-
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
-        </div>
-      </div>
-
-      <div className="text-center">
-        <span className="text-gray-600 text-sm">Não tem uma conta? </span>
-        <button
-          type="button"
-          className="text-blue-600 hover:text-blue-500 font-medium text-sm"
-          disabled={loading}
-        >
-          Criar uma conta
-        </button>
-      </div>
     </form>
   );
 }

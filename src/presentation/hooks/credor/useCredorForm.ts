@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Credor } from "@/domain/entities/Credor";
-import { credorService } from "@/application/services/CredorService";
-import { formatCNPJ, formatCPF, removeMask, validateCNPJ, validateCPF } from "@/presentation/utils/documentUtils";
+import { credorService } from "@/infrastructure/di/services";
+import { formatCNPJ, formatCPF, removeMask, validateCNPJ, validateCPF } from "@/domain/utils/documentUtils";
 
 interface FormData {
   cnpj: string;
   cpf: string;
   nome: string;
   fantasia: string;
+  cdContaCorrente: string;
 }
 
 interface FieldValidation {
@@ -57,6 +58,7 @@ export function useCredorForm(): UseCredorFormReturn {
     cpf: "",
     nome: "",
     fantasia: "",
+    cdContaCorrente: "",
   });
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({
@@ -129,7 +131,7 @@ export function useCredorForm(): UseCredorFormReturn {
   const openModal = () => {
     setShowModal(true);
     setEditingId(null);
-    setFormData({ cnpj: "", cpf: "", nome: "", fantasia: "" });
+    setFormData({ cnpj: "", cpf: "", nome: "", fantasia: "", cdContaCorrente: "" });
     setFieldErrors({
       cnpj: { isValid: true, message: "" },
       cpf: { isValid: true, message: "" },
@@ -152,6 +154,7 @@ export function useCredorForm(): UseCredorFormReturn {
       cpf: credor.cpf ? formatCPF(credor.cpf) : "",
       nome: credor.nome,
       fantasia: credor.fantasia || "",
+      cdContaCorrente: credor.cdContaCorrente ? String(credor.cdContaCorrente) : "",
     });
     setFieldErrors({
       cnpj: { isValid: true, message: "" },
@@ -228,6 +231,9 @@ export function useCredorForm(): UseCredorFormReturn {
           nome: { isValid: false, message: "Nome é obrigatório" },
         }));
       }
+    } else if (field === "cdContaCorrente") {
+      const onlyNumbers = value.replace(/\D/g, "");
+      setFormData((prev) => ({ ...prev, cdContaCorrente: onlyNumbers }));
     } else {
       setFormData((prev) => ({ ...prev, [field]: value }));
     }
@@ -262,6 +268,14 @@ export function useCredorForm(): UseCredorFormReturn {
       isValid = false;
     }
 
+    if (formData.cdContaCorrente) {
+      const contaCorrente = Number(formData.cdContaCorrente);
+      if (!Number.isInteger(contaCorrente) || contaCorrente <= 0) {
+        toast.error("Conta corrente deve ser um número inteiro maior que zero");
+        isValid = false;
+      }
+    }
+
     if (!fieldErrors.cnpj.isValid || !fieldErrors.cpf.isValid) {
       toast.error("Corrija os erros antes de salvar");
       isValid = false;
@@ -285,6 +299,7 @@ export function useCredorForm(): UseCredorFormReturn {
         fantasia: formData.fantasia.trim() || undefined,
         cnpj: formData.cnpj ? removeMask(formData.cnpj) : undefined,
         cpf: formData.cpf ? removeMask(formData.cpf) : undefined,
+        cdContaCorrente: formData.cdContaCorrente ? Number(formData.cdContaCorrente) : undefined,
       };
 
       if (editingId) {
@@ -296,7 +311,7 @@ export function useCredorForm(): UseCredorFormReturn {
       }
 
       closeModal();
-      setFormData({ cnpj: "", cpf: "", nome: "", fantasia: "" });
+      setFormData({ cnpj: "", cpf: "", nome: "", fantasia: "", cdContaCorrente: "" });
       setShowSuccessModal(true);
       onSuccess();
     } catch (error) {

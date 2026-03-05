@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Credor } from "@/domain/entities/Credor";
-import { formatCNPJ, formatCPF } from "@/presentation/utils/documentUtils";
+import { formatCNPJ, formatCPF } from "@/domain/utils/documentUtils";
+import { ChevronUp, ChevronDown, ChevronsUpDown, MoreHorizontal } from "lucide-react";
 
 type SortField = 'codigo' | 'nome' | 'cnpj' | 'cpf' | 'ativo' | null;
 type SortOrder = 'asc' | 'desc';
@@ -49,21 +50,23 @@ export function CredorTable({
   const [selectedCredorKey, setSelectedCredorKey] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [goToPageInput, setGoToPageInput] = useState<string>('');
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
 
-  // Função para gerar chave única do credor
-  const getCredorKey = (credor: Credor) => credor.cnpj || credor.cpf || credor.nome;
+  const getCredorKey = (credor: Credor) =>
+    credor.codigo?.toString() || credor.cnpj || credor.cpf || credor.nome;
 
   const selectedCredor = results.find(c => getCredorKey(c) === selectedCredorKey);
 
-  // Calcula o range de itens sendo exibidos
   const startItem = (pagination.page - 1) * pagination.pageSize + 1;
   const endItem = Math.min(pagination.page * pagination.pageSize, pagination.total);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
-      return <span className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">⇅</span>;
+      return <ChevronsUpDown size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />;
     }
-    return <span className="text-[#0048B0]">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    return sortOrder === 'asc'
+      ? <ChevronUp size={14} className="text-[#0048B0]" aria-hidden="true" />
+      : <ChevronDown size={14} className="text-[#0048B0]" aria-hidden="true" />;
   };
 
   useEffect(() => {
@@ -73,12 +76,14 @@ export function CredorTable({
       const target = e.target as HTMLElement;
       if (!target.closest('[data-actions-menu]')) {
         setSelectedCredorKey(null);
+        setConfirmDeleteKey(null);
       }
     };
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelectedCredorKey(null);
+        setConfirmDeleteKey(null);
       }
     };
 
@@ -99,11 +104,10 @@ export function CredorTable({
     setSelectedCredorKey(null);
   };
 
-  const handleDelete = (credor: Credor) => {
-    if (!confirm("Tem certeza que deseja excluir este credor?")) return;
-
+  const handleDeleteConfirm = (credor: Credor) => {
     onDelete(credor);
     setSelectedCredorKey(null);
+    setConfirmDeleteKey(null);
   };
 
   return (
@@ -259,6 +263,7 @@ export function CredorTable({
 
                       if (selectedCredorKey === key) {
                         setSelectedCredorKey(null);
+                        setConfirmDeleteKey(null);
                         return;
                       }
 
@@ -268,14 +273,15 @@ export function CredorTable({
                         left: rect.right - 192,
                       });
 
+                      setConfirmDeleteKey(null);
                       setSelectedCredorKey(key);
                     }}
-                    className="text-gray-600 hover:text-[#0048B0] hover:bg-gray-100 rounded p-2 transition-colors"
+                    className="inline-flex items-center justify-center text-gray-600 hover:text-[#0048B0] hover:bg-gray-100 rounded p-2 transition-colors"
                     aria-label={`Ações para ${c.nome}`}
                     aria-haspopup="menu"
                     aria-expanded={selectedCredorKey === getCredorKey(c) ? "true" : "false"}
                   >
-                    •••
+                    <MoreHorizontal size={18} />
                   </button>
                 </td>
               </tr>
@@ -286,11 +292,9 @@ export function CredorTable({
       </div>
 
       {!loading && results.length > 0 && (
-        <div className="flex flex-col gap-4 px-6 py-4 border-t border-gray-200 bg-gray-50">
-          {/* Linha superior: Informações e controles */}
+        <div className="flex flex-col gap-4 px-6 py-4 border-t border-gray-200 bg-gray-50 !text-gray-900">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            {/* Informações */}
-            <div className="flex items-center gap-4 text-sm text-gray-900">
+            <div className="flex items-center gap-4 text-sm !text-gray-900">
               <span role="status" aria-live="polite">
                 Mostrando <span className="font-semibold text-[#0048B0]">{startItem}-{endItem}</span> de{' '}
                 <span className="font-semibold text-[#0048B0]">{pagination.total}</span> credores
@@ -302,9 +306,8 @@ export function CredorTable({
               </span>
             </div>
 
-            {/* Controles de itens por página */}
             <div className="flex items-center gap-2">
-              <label htmlFor="page-size" className="text-sm text-gray-600">
+              <label htmlFor="page-size" className="text-sm !text-gray-900 font-semibold">
                 Itens por página:
               </label>
               <select
@@ -322,10 +325,8 @@ export function CredorTable({
             </div>
           </div>
 
-          {/* Linha inferior: Navegação de páginas */}
           {totalPages > 1 && (
             <nav aria-label="Paginação" className="flex flex-wrap items-center justify-between gap-4">
-              {/* Botões de navegação esquerda */}
               <div className="flex gap-2">
                 <button
                   onClick={() => onPageChange(1)}
@@ -333,9 +334,7 @@ export function CredorTable({
                   className="px-3 py-2 bg-[#0048B0] text-white rounded-lg text-sm hover:bg-[#003c90] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   aria-label="Primeira página"
                   title="Primeira página"
-                >
-                  ««
-                </button>
+                >{"<<"}</button>
                 <button
                   onClick={() => onPageChange(pagination.page - 1)}
                   disabled={pagination.page === 1}
@@ -346,7 +345,6 @@ export function CredorTable({
                 </button>
               </div>
 
-              {/* Números de página */}
               <div className="flex items-center gap-2">
                 <div className="flex gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -379,9 +377,8 @@ export function CredorTable({
                   })}
                 </div>
 
-                {/* Input para ir para página específica */}
                 <div className="flex items-center gap-2 ml-2 pl-2 border-l border-gray-300">
-                  <label htmlFor="goto-page" className="text-sm text-gray-600">
+                  <label htmlFor="goto-page" className="text-sm !text-gray-900 font-semibold">
                     Ir para:
                   </label>
                   <input
@@ -391,7 +388,7 @@ export function CredorTable({
                     max={totalPages}
                     value={goToPageInput}
                     onChange={(e) => setGoToPageInput(e.target.value)}
-                    onKeyPress={(e) => {
+                    onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const page = parseInt(goToPageInput);
                         if (page) {
@@ -421,7 +418,6 @@ export function CredorTable({
                 </div>
               </div>
 
-              {/* Botões de navegação direita */}
               <div className="flex gap-2">
                 <button
                   onClick={() => onPageChange(pagination.page + 1)}
@@ -437,9 +433,7 @@ export function CredorTable({
                   className="px-3 py-2 bg-[#0048B0] text-white rounded-lg text-sm hover:bg-[#003c90] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   aria-label="Última página"
                   title="Última página"
-                >
-                  »»
-                </button>
+                >{">>"}</button>
               </div>
             </nav>
           )}
@@ -451,94 +445,96 @@ export function CredorTable({
           data-actions-menu
           role="menu"
           aria-label="Ações do credor"
-          className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-200"
+          className="fixed w-52 bg-white rounded-lg shadow-xl border border-gray-200"
           style={{
             top: `${menuPosition.top}px`,
             left: `${menuPosition.left}px`,
             zIndex: 9999,
           }}
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(selectedCredor);
-              setSelectedCredorKey(null);
-            }}
-            className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 rounded-t-lg transition-colors border-b border-gray-100"
-            aria-label="Visualizar credor"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-              />
-            </svg>
-            Visualizar
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggleStatus(selectedCredor);
-              setSelectedCredorKey(null);
-            }}
-            className={`w-full text-left px-4 py-3 text-sm flex items-center gap-2 rounded-b-lg transition-colors ${
-              selectedCredor.ativo === "S"
-                ? "text-yellow-600 hover:bg-yellow-50"
-                : "text-green-600 hover:bg-green-50"
-            }`}
-            aria-label={selectedCredor.ativo === "S" ? "Desativar credor" : "Ativar credor"}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              {selectedCredor.ativo === "S" ? (
-                <>
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 3l18 18"
-                  />
-                </>
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              )}
-            </svg>
-            {selectedCredor.ativo === "S" ? "Desativar" : "Ativar"}
-          </button>
+          {confirmDeleteKey === selectedCredorKey ? (
+            <div className="p-3">
+              <p className="text-sm text-gray-700 font-medium mb-1">Excluir credor?</p>
+              <p className="text-xs text-gray-500 mb-3">Esta ação não pode ser desfeita.</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteKey(null); }}
+                  className="flex-1 px-3 py-1.5 text-xs border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteConfirm(selectedCredor); }}
+                  className="flex-1 px-3 py-1.5 text-xs bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(selectedCredor);
+                  setSelectedCredorKey(null);
+                }}
+                className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm text-gray-700 flex items-center gap-2 transition-colors border-b border-gray-100"
+                aria-label="Visualizar credor"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Visualizar
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmDeleteKey(selectedCredorKey);
+                }}
+                className="w-full text-left px-4 py-3 text-sm flex items-center gap-2 text-red-600 hover:bg-red-50 transition-colors border-b border-gray-100"
+                aria-label="Excluir credor"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M4 7h16M10 3h4a1 1 0 011 1v3H9V4a1 1 0 011-1z" />
+                </svg>
+                Excluir
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleStatus(selectedCredor);
+                }}
+                className={`w-full text-left px-4 py-3 text-sm flex items-center gap-2 rounded-b-lg transition-colors ${
+                  selectedCredor.ativo === "S"
+                    ? "text-yellow-600 hover:bg-yellow-50"
+                    : "text-green-600 hover:bg-green-50"
+                }`}
+                aria-label={selectedCredor.ativo === "S" ? "Desativar credor" : "Ativar credor"}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  {selectedCredor.ativo === "S" ? (
+                    <>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+                    </>
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  )}
+                </svg>
+                {selectedCredor.ativo === "S" ? "Desativar" : "Ativar"}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

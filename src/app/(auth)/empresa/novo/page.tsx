@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { empresaService } from "@/application/services/EmpresaService";
+import { empresaService } from "@/infrastructure/di/services";
 import { Empresa } from "@/domain/entities/Empresa";
 
 export default function NovaEmpresaPage() {
@@ -16,7 +16,7 @@ export default function NovaEmpresaPage() {
     codgrupoempresa: "",
     nucnpj: "",
     uf: "",
-    ativo: "ativo",
+    ativo: "S",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,8 +81,8 @@ export default function NovaEmpresaPage() {
           onChange={(e) => setFormData({ ...formData, ativo: e.target.value })}
           required
         >
-          <option value="ativo">Ativo</option>
-          <option value="inativo">Inativo</option>
+          <option value="S">Ativo</option>
+          <option value="N">Inativo</option>
         </select>
 
         <div className="col-span-full flex justify-end gap-2 mt-4">

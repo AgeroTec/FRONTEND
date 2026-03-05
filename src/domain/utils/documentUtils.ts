@@ -1,16 +1,18 @@
 export function formatCNPJ(value: string): string {
-  const numbers = value.replace(/\D/g, '');
+  const numbers = value.replace(/\D/g, "");
 
   if (numbers.length <= 2) return numbers;
   if (numbers.length <= 5) return `${numbers.slice(0, 2)}.${numbers.slice(2)}`;
   if (numbers.length <= 8) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5)}`;
-  if (numbers.length <= 12) return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+  if (numbers.length <= 12) {
+    return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8)}`;
+  }
 
   return `${numbers.slice(0, 2)}.${numbers.slice(2, 5)}.${numbers.slice(5, 8)}/${numbers.slice(8, 12)}-${numbers.slice(12, 14)}`;
 }
 
 export function formatCPF(value: string): string {
-  const numbers = value.replace(/\D/g, '');
+  const numbers = value.replace(/\D/g, "");
 
   if (numbers.length <= 3) return numbers;
   if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
@@ -20,7 +22,7 @@ export function formatCPF(value: string): string {
 }
 
 export function removeMask(value: string): string {
-  return value.replace(/\D/g, '');
+  return value.replace(/\D/g, "");
 }
 
 export function validateCNPJ(cnpj: string): boolean {
@@ -77,11 +79,11 @@ export function validateCPF(cpf: string): boolean {
   return result === parseInt(numbers.charAt(10));
 }
 
-export function getDocumentType(value: string): 'cnpj' | 'cpf' | null {
+export function getDocumentType(value: string): "cnpj" | "cpf" | null {
   const numbers = removeMask(value);
 
-  if (numbers.length === 14) return 'cnpj';
-  if (numbers.length === 11) return 'cpf';
+  if (numbers.length === 14) return "cnpj";
+  if (numbers.length === 11) return "cpf";
 
   return null;
 }

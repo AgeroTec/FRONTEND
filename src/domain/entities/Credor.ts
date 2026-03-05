@@ -2,6 +2,7 @@ import { PaginationParams } from "../types/Common";
 
 export interface Credor {
   codigo?: number;
+  cdContaCorrente?: number;
   nome: string;
   fantasia?: string;
   cnpj?: string;
